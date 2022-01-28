@@ -90,8 +90,8 @@ int main(int argc, char *argv[]) {
     pid_t pid = getpid();
 
 
-
-
+    // 3. Run the main loop prompting user to enter in commands
+    
 
 
     tms end_CPU;
