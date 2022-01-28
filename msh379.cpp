@@ -91,8 +91,23 @@ int main(int argc, char *argv[]) {
 
 
     // 3. Run the main loop prompting user to enter in commands
+    for(;;) {
+        string cmd;
 
-asdasd
+        // clear the input and get the input
+        cin.clear();
+        printf("msh379 ", pid, ": ");
+        getline(cin, cmd);
+
+        //tokenize the input
+        istringstream in_string(cmd);
+        vector<string> tokens = 
+        
+
+
+
+
+    }
 
     tms end_CPU;
     static clock_t end_time = times(&end_CPU)
