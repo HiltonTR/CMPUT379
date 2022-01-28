@@ -33,15 +33,21 @@
 #include <cassert>
 #include <cstring>
 #include <cstdarg>             //Handling of variable length argument lists
-#include <sys/time.h>
+#include <sys/times.h>
+
+#include <sstream>
+#include <signal.h>
+#include <stdlib.h>
+#include <tuple>
+#include <algorithm>
 
 #include <unistd.h>		
 #include <sys/types.h>
 #include <sys/stat.h>	
 #include <sys/wait.h>
-#include <sys/times.h>
+#include <sys/resource.h>
 #include <fcntl.h>
-
+#include <iostream>
 #include <string>
 #include <vector>
 using namespace std;
@@ -50,27 +56,6 @@ using namespace std;
 
 #define MAXLINE 256
 
-typedef struct { char city[MAXLINE]; int temp; } cityTemp_t;
-
-// ------------------------------
-// The WARNING and FATAL functions are due to the authors of
-// the AWK Programming Language.
-
-void WARNING (const char *fmt, ... )
-{
-    va_list  ap;
-    fflush (stdout);
-    va_start (ap, fmt);  vfprintf (stderr, fmt, ap);  va_end(ap);
-}
-
-void FATAL (const char *fmt, ... )
-{
-    va_list  ap;
-    fflush (stdout);
-    va_start (ap, fmt);  vfprintf (stderr, fmt, ap);  va_end(ap);
-    fflush (NULL);
-    exit(1);
-}
 // ------------------------------------------------------------
 // clrScreen() -- send VT100 escape sequence to clear the screen
 // 	          (works fine in some cases)
@@ -82,48 +67,41 @@ void clrScreen () {
 
 // ------------------------------------------------------------
 
-void test_vector ()
-{
-    unsigned int        i, count;	
-    vector<cityTemp_t>  ct;
 
-    ct.clear();		 // Important to reset size to zero
-
-    cityTemp_t  data[] = { {"Victoria", 16}, {"Vancouver", 15}, {"Prince George", 8},
-    		           {"Edmonton", 5},  {"Calgary", 12}, {"Saskatoon", 9},
-			   {"Regina", 11}, {"Winnipeg", 11} };
-
-
-    count=  sizeof(data)/sizeof(cityTemp_t); 			   
-
-    for (i=0 ; i < count; i++) ct.push_back(data[i]);
-
-    printf ("test_vector: city-temperature table: ");
-    for (i=0; i < ct.size(); i++)
-        printf("[%s, %d], ", ct[i].city, ct[i].temp);
-    printf("\n");
-
+void set_cpu_limit() {
+    // 1. Set time limit to 10 mins
+    rlimit cpuLimit{};
+    cpuLimit.rlim_cur = 600;
+    cpuLimit.rlim_max = 600;
+    setrlimit(RLIMIT_CPU, &cpuLimit)
 }
 
 // ------------------------------ 
 int main(int argc, char *argv[]) {
+    // Set time limit to 10 mins
+    set_cpu_limit();
 
-    char     strArg[MAXLINE];
-    int	     intArg;
+    // 2. Call function times() to get CPU times
+    tms start_CPU;
 
-    strcpy (strArg, "");    intArg= 0;
+    static clock_t start_time = times(&start_CPU);
 
-    clrScreen();
-
-    // read argv[1] (a text string) and argv[2] (an integer)
-    //
-    if (argc >= 2)  strcpy (strArg, argv[1]);  	// string copy
-    if (argc >= 3)  intArg= atoi(argv[2]);
-    printf ("%s:  strArg= %s, intArg= %d \n", argv[0], strArg, intArg);
+    // gets pid of process
+    pid_t pid = getpid();
 
 
-    test_vector();
-  
-    WARNING ("testing function WARNING [%s] [%d]\n", strArg, intArg);
+
+
+
+
+    tms end_CPU;
+    static clock_t end_time = times(&end_CPU)
+    printf("Real time:        %.2f sec.\n", (float)(end_time - start_time)/sysconf(_SC_CLK_TCK));
+    printf("User Time:        %.2f sec.\n", (float)(end_CPU.tms_utime - start_CPU.tms_utime)/sysconf(_SC_CLK_TCK));
+    printf("Sys Time:         %.2f sec.\n", (float)(end_CPU.tms_stime - start_CPU.tms_stime)/sysconf(_SC_CLK_TCK));
+    printf("Child user time:  %.2f sec.\n", (float)(end_CPU.tms_cutime - start_CPU.tms_cutime)/sysconf(_SC_CLK_TCK));
+    printf("Child sys time:   %.2f sec.\n", (float)(end_CPU.tms_cstime - start_CPU.tms_cstime)/sysconf(_SC_CLK_TCK));
+
+    return 0;
 }
 
