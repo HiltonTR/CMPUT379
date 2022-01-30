@@ -35,6 +35,10 @@
 #include <cstdarg>             //Handling of variable length argument lists
 #include <sys/times.h>
 
+#include <stdarg.h>
+#include <string.h>
+#include <stdio.h>
+#include <iterator>
 #include <sstream>
 #include <signal.h>
 #include <stdlib.h>
@@ -55,17 +59,18 @@ using namespace std;
 // ------------------------------
 
 #define MAXLINE 256
+#define MAXTASKS 32
+int jobIndex = 0;
 
-// ------------------------------------------------------------
-// clrScreen() -- send VT100 escape sequence to clear the screen
-// 	          (works fine in some cases)
+struct task {
+    int index;
+    pid_t pid;
+    string cmd;
+    bool running;
+};
 
-void clrScreen () {
-     char   ESC=033;		// the ESC character
-     printf ("%c[2J", ESC); printf ("%c[H", ESC);
-}
+vector<task> allTasks;
 
-// ------------------------------------------------------------
 
 
 void set_cpu_limit() {
@@ -73,7 +78,102 @@ void set_cpu_limit() {
     rlimit cpuLimit{};
     cpuLimit.rlim_cur = 600;
     cpuLimit.rlim_max = 600;
-    setrlimit(RLIMIT_CPU, &cpuLimit)
+    setrlimit(RLIMIT_CPU, &cpuLimit);
+}
+
+void changeDirectory(string tokens) {
+    char cwd[MAXLINE];
+
+    string home = getenv("HOME");
+    string delimiter = "/";
+    string path1 = tokens.substr(0, tokens.find(delimiter));
+    string path = tokens.c_str();
+
+    if (path1 == "$HOME") {
+        path.replace(0, 5, home.c_str());
+    }
+
+    if (chdir(path.c_str()) < 0) {
+        printf("cdir: failed (pathname= %s) \n", path.c_str());
+    } else {
+        getcwd(cwd, sizeof(cwd));
+        printf("cdir: done (pathname= %s) \n", cwd);
+    };
+}
+
+void printDirectory() {
+    char cwd[256];
+    getcwd(cwd, sizeof(cwd));
+    printf("%s\n", cwd);
+}
+
+void listTasks() {
+    for (auto &current_task : allTasks) {
+        if(current_task.running) {
+            printf("%i: (pid: %i cmd: %s\n)", current_task.index, current_task.pid, current_task.cmd.c_str());
+        }
+    }
+}
+
+void run(vector<string> &tokens) {
+    if (jobIndex < MAXTASKS) {
+        bool error = false;
+        pid_t childPID = fork();
+        if (childPID == -1){
+            error = true;
+            printf("could not fork\n");
+        } else {
+            switch (tokens.size()) {
+                case 1:
+                    printf("not enough arguments\n");
+                    break;
+                case 2:
+                    execlp(tokens.at(1).c_str(), tokens.at(1).c_str(), (char *) nullptr);
+                    break;
+                case 3:
+                    execlp(tokens.at(1).c_str(), tokens.at(1).c_str(), tokens.at(2).c_str(), (char *) nullptr);
+                    break;
+                case 4:
+                    execlp(tokens.at(1).c_str(), tokens.at(1).c_str(), tokens.at(2).c_str(),
+                           tokens.at(3).c_str(), (char *) nullptr);
+                    break;
+                case 5:
+                    execlp(tokens.at(1).c_str(), tokens.at(1).c_str(), tokens.at(2).c_str(),
+                           tokens.at(3).c_str(), tokens.at(4).c_str(), (char *) nullptr);
+                    break;
+                case 6:
+                    execlp(tokens.at(1).c_str(), tokens.at(1).c_str(), tokens.at(2).c_str(),
+                           tokens.at(3).c_str(), tokens.at(4).c_str(), tokens.at(5).c_str(), (char *) nullptr);    
+                    break;
+                default:
+                    printf("too many arguments\n");
+                    break;
+            }
+        }
+
+        if(error == true){
+            printf("issue running command\n");
+        } else {
+            task newTask;
+            newTask.index = jobIndex;
+            newTask.pid = childPID;
+            newTask.cmd = tokens.at(1);
+            newTask.running = true;
+            allTasks.push_back(newTask);
+            jobIndex++;
+        }
+
+    } else {
+        printf("too many jobs\n");
+    }
+}
+
+void exitLoop() {
+
+}
+
+void quitLoop() {
+    printf("Exiting mainloop without terminating head processes\n");
 }
 
 // ------------------------------ 
@@ -96,12 +196,47 @@ int main(int argc, char *argv[]) {
 
         // clear the input and get the input
         cin.clear();
-        printf("msh379 ", pid, ": ");
+        printf("msh379 [%u]: ", pid);
         getline(cin, cmd);
 
         //tokenize the input
+        // taken from https://stackoverflow.com/questions/236129/how-do-i-iterate-over-the-words-of-a-string#236803
         istringstream in_string(cmd);
-        vector<string> tokens = 
+        vector<string> tokens {
+            istream_iterator<string>{in_string},
+            istream_iterator<string>{}
+        };
+        if (tokens.empty()) {
+            printf("Missing input \n");
+        } else if (tokens.at(0) == "cdir"){
+            try {
+            changeDirectory(tokens.at(1).c_str());
+            } catch (const std::out_of_range) {
+                printf("not enough arguments for cdir \n");
+            }
+        } else if (tokens.at(0) == "pdir"){
+            printDirectory();
+        } else if (tokens.at(0) == "lstasks"){
+            listTasks();
+        } else if (tokens.at(0) == "run"){
+            run(tokens);
+        } else if (tokens.at(0) == "stop"){
+            printf("temp");       
+        } else if (tokens.at(0) == "continue"){
+            printf("temp");
+        } else if (tokens.at(0) == "terminate"){
+            printf("temp");
+        } else if (tokens.at(0) == "check"){
+            printf("temp");
+        } else if (tokens.at(0) == "exit"){
+            exitLoop();
+            break;
+        } else if (tokens.at(0) == "quit"){
+            quitLoop();
+            break;
+        } else {
+            printf("Invalid Command \n");   
+        }
         
 
 
@@ -110,7 +245,7 @@ int main(int argc, char *argv[]) {
     }
 
     tms end_CPU;
-    static clock_t end_time = times(&end_CPU)
+    static clock_t end_time = times(&end_CPU);
     printf("Real time:        %.2f sec.\n", (float)(end_time - start_time)/sysconf(_SC_CLK_TCK));
     printf("User Time:        %.2f sec.\n", (float)(end_CPU.tms_utime - start_CPU.tms_utime)/sysconf(_SC_CLK_TCK));
     printf("Sys Time:         %.2f sec.\n", (float)(end_CPU.tms_stime - start_CPU.tms_stime)/sysconf(_SC_CLK_TCK));
