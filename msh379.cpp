@@ -110,12 +110,13 @@ void printDirectory() {
 void listTasks() {
     for (auto &current_task : allTasks) {
         if(current_task.running) {
-            printf("%i: (pid: %i cmd: %s)\n", current_task.index, current_task.pid, current_task.cmd.c_str());
+            printf("%i: (pid: %i cmd:%s)\n", current_task.index, current_task.pid, current_task.cmd.c_str());
         }
     }
 }
 
 void run(vector<string> &tokens) {
+
     if (tokens.size() == 1) {
         printf("missing args\n");
     } else if(tokens.size() > 6) {
@@ -155,16 +156,60 @@ void run(vector<string> &tokens) {
             printf("issue running command\n");
             errno = 0;
         } else {
+            string cmdStr;
+            int length = tokens.size();
+            for (int i=1; i < length; i++) {
+                cmdStr.append(" " + tokens.at(i));
+            }
+            cout << cmdStr << endl;
             task newTask;
             newTask.index = taskIndex;
             newTask.pid = childPID;
-            newTask.cmd = tokens.at(1);
+            newTask.cmd = cmdStr;
             newTask.running = true;
             allTasks.push_back(newTask);
             taskIndex++;
         }
 
     } 
+}
+
+
+
+void stopTask(vector<string> &tokens) {
+    if (tokens.size() < 2) {
+        printf("No task number\n");
+    } else if (tokens.size() > 2) {
+        printf("Too many args\n");
+    } else {
+        int taskNo = stoi(tokens.at(1), nullptr, 10);
+        if (taskNo < allTasks.size()) {
+            kill(allTasks.at(taskNo).pid, SIGSTOP);
+            printf("Stopped task: %i\n", taskNo);
+        } else {
+            printf("Failed to find task: %i - not stopping\n", taskNo);
+        }
+    }
+}
+
+void continueTask(vector<string> &tokens) {
+    if (tokens.size() < 2) {
+        printf("No task number\n");
+    } else if (tokens.size() > 2) {
+        printf("Too many args\n");
+    } else {
+        int taskNo = stoi(tokens.at(1), nullptr, 10);
+        if (taskNo < allTasks.size()) {
+            kill(allTasks.at(taskNo).pid, SIGCONT);
+            printf("Continued task: %i\n", taskNo);
+        } else {
+            printf("Failed to find task: %i - not continuing\n", taskNo);
+        }
+    }
+}
+
+void terminate(vector<string> &tokens) {
+
 }
 
 void exitLoop() {
@@ -220,9 +265,9 @@ int main(int argc, char *argv[]) {
         } else if (tokens.at(0) == "run"){
             run(tokens);
         } else if (tokens.at(0) == "stop"){
-            printf("temp");       
+            stopTask(tokens);
         } else if (tokens.at(0) == "continue"){
-            printf("temp");
+            continueTask(tokens);
         } else if (tokens.at(0) == "terminate"){
             printf("temp");
         } else if (tokens.at(0) == "check"){
