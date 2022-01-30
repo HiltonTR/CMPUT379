@@ -209,7 +209,7 @@ void continueTask(vector<string> &tokens) {
 }
 
 void terminate(vector<string> &tokens) {
-
+    
 }
 
 void exitLoop() {
