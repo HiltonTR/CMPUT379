@@ -60,7 +60,7 @@ using namespace std;
 
 #define MAXLINE 256
 #define MAXTASKS 32
-int jobIndex = 0;
+int taskIndex = 0;
 
 struct task {
     int index;
@@ -110,23 +110,26 @@ void printDirectory() {
 void listTasks() {
     for (auto &current_task : allTasks) {
         if(current_task.running) {
-            printf("%i: (pid: %i cmd: %s\n)", current_task.index, current_task.pid, current_task.cmd.c_str());
+            printf("%i: (pid: %i cmd: %s)\n", current_task.index, current_task.pid, current_task.cmd.c_str());
         }
     }
 }
 
 void run(vector<string> &tokens) {
-    if (jobIndex < MAXTASKS) {
-        bool error = false;
+    if (tokens.size() == 1) {
+        printf("missing args\n");
+    } else if(tokens.size() > 6) {
+        printf("too many args\n");
+    } else if (taskIndex > MAXTASKS){
+        printf("too many jobs\n");
+    } else {
+        errno = 0;
         pid_t childPID = fork();
         if (childPID == -1){
-            error = true;
             printf("could not fork\n");
-        } else {
+            errno = 1;
+        } else if (childPID == 0) {
             switch (tokens.size()) {
-                case 1:
-                    printf("not enough arguments\n");
-                    break;
                 case 2:
                     execlp(tokens.at(1).c_str(), tokens.at(1).c_str(), (char *) nullptr);
                     break;
@@ -145,27 +148,23 @@ void run(vector<string> &tokens) {
                     execlp(tokens.at(1).c_str(), tokens.at(1).c_str(), tokens.at(2).c_str(),
                            tokens.at(3).c_str(), tokens.at(4).c_str(), tokens.at(5).c_str(), (char *) nullptr);    
                     break;
-                default:
-                    printf("too many arguments\n");
-                    break;
             }
         }
 
-        if(error == true){
+        if(errno){
             printf("issue running command\n");
+            errno = 0;
         } else {
             task newTask;
-            newTask.index = jobIndex;
+            newTask.index = taskIndex;
             newTask.pid = childPID;
             newTask.cmd = tokens.at(1);
             newTask.running = true;
             allTasks.push_back(newTask);
-            jobIndex++;
+            taskIndex++;
         }
 
-    } else {
-        printf("too many jobs\n");
-    }
+    } 
 }
 
 void exitLoop() {
