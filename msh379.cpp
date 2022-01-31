@@ -42,7 +42,6 @@
 #include <sstream>
 #include <signal.h>
 #include <stdlib.h>
-#include <tuple>
 #include <algorithm>
 
 #include <unistd.h>		
@@ -71,6 +70,23 @@ struct task {
 
 vector<task> allTasks;
 
+struct parent {
+    string user;
+    string pid;
+    string ppid;
+    string state;
+    string start;
+    string cmd;
+    string others;
+};
+
+struct child {
+    string pid;
+    string cmd;
+};
+
+vector<parent> processes;
+vector<child> c_processes;
 
 
 void set_cpu_limit() {
@@ -227,8 +243,110 @@ void terminate(vector<string> &tokens) {
     }    
 }
 
-void check() {
+parent processBuffer(const string &buffer) {
+    parent newParent;
+    stringstream sStream(buffer);
+    string tokens;
 
+    int i = 0;
+    while (getline(sStream, tokens, ' ')) {
+        if (tokens.length()) {
+            if (i == 0) {
+                newParent.user = tokens.c_str();
+            } else if (i == 1) {
+                newParent.pid = tokens.c_str();
+            } else if (i == 2) {
+                newParent.ppid = tokens.c_str();
+            } else if (i == 3) {
+                newParent.state = tokens.c_str();
+            } else if (i == 4) {
+                newParent.start = tokens.c_str();
+            } else if (i == 5) {
+                newParent.cmd = tokens.c_str();
+            } else {
+                newParent.others.append(tokens.c_str());               
+            }
+            i++;
+        }
+    }
+
+    return newParent;
+}
+
+vector<parent> getParent(vector<string> &tokens) {
+    vector<parent> output;
+    char buffer[256];
+    string result;
+    FILE* pipe = popen("ps -u $USER -o user,pid,ppid,state,start,cmd --sort start", "r");
+    if (pipe) {
+        while (!feof(pipe)) {
+            if (fgets(buffer, 256, pipe) != NULL) {
+                //printf("%s", buffer);
+                parent newParent = processBuffer(buffer);
+                output.push_back(newParent);
+            }
+        }
+    pclose(pipe);
+    }
+    return output;
+}
+
+void getState(string targetPID) {
+    for (auto &currentProcess : processes) {
+        if (currentProcess.pid == targetPID) {
+            if(currentProcess.others.find("defunct") != string::npos) {
+                printf("    target_pid= %s terminated\n", currentProcess.pid.c_str());
+                printf("    USER       PID    PPID S  STARTED CMD\n");
+                cout <<"    " << currentProcess.user << " ";
+                cout << currentProcess.pid << " ";
+                cout << currentProcess.ppid << " ";
+                cout << currentProcess.state << " ";
+                cout << currentProcess.start << " ";
+                cout << currentProcess.cmd << " ";
+                cout << currentProcess.others << endl;
+            } else {
+                printf("    target_pid= %s is running:\n", currentProcess.pid.c_str());
+                printf("    USER       PID    PPID S  STARTED CMD\n");
+                cout <<"    " << currentProcess.user << " ";
+                cout << currentProcess.pid << " ";
+                cout << currentProcess.ppid << " ";
+                cout << currentProcess.state << " ";
+                cout << currentProcess.start << " ";
+                cout << currentProcess.cmd << " ";
+                cout << currentProcess.others;
+            }
+        }
+    }
+}
+
+void get_c_processes(string targetPID){
+    for (auto &currentProcess : processes) {
+        if (currentProcess.ppid == targetPID) {
+            cout <<"    " << currentProcess.user << " ";
+            cout << currentProcess.pid << " ";
+            cout << currentProcess.ppid << " ";
+            cout << currentProcess.state << " ";
+            cout << currentProcess.start << " ";
+            cout << currentProcess.cmd << " ";
+            cout << currentProcess.others;
+            get_c_processes(currentProcess.pid);
+        }
+    }
+
+}
+
+void check(vector<string> &tokens) {
+    vector<parent> output;
+    if (tokens.size() < 2) {
+        printf("No task number\n");
+    } else if (tokens.size() > 2) {
+        printf("Too many args\n");
+    } else {
+        string targetPID = tokens.at(1).c_str();
+        processes = getParent(tokens);
+        getState(targetPID);
+        get_c_processes(targetPID);
+    }
 }
 
 void exitLoop() {
@@ -295,7 +413,7 @@ int main(int argc, char *argv[]) {
         } else if (tokens.at(0) == "terminate"){
             terminate(tokens);
         } else if (tokens.at(0) == "check"){
-            printf("temp");
+            check(tokens);
         } else if (tokens.at(0) == "exit"){
             exitLoop();
             break;

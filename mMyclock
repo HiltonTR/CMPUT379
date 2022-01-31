@@ -1,0 +1,5 @@
+#!/bin/sh
+myclock outA&
+myclock outB&
+myclock outC&
+wait
