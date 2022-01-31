@@ -80,13 +80,8 @@ struct parent {
     string others;
 };
 
-struct child {
-    string pid;
-    string cmd;
-};
 
 vector<parent> processes;
-vector<child> c_processes;
 
 
 void set_cpu_limit() {
