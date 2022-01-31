@@ -303,7 +303,7 @@ void getState(string targetPID) {
                 cout << currentProcess.state << " ";
                 cout << currentProcess.start << " ";
                 cout << currentProcess.cmd << " ";
-                cout << currentProcess.others << endl;
+                cout << currentProcess.others;
             } else {
                 printf("    target_pid= %s is running:\n", currentProcess.pid.c_str());
                 printf("    USER       PID    PPID S  STARTED CMD\n");
