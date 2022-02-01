@@ -225,9 +225,9 @@ void stopTask(vector<string> &tokens) {
 void continueTask(vector<string> &tokens) {
     // checks and makes the input is proper
     if (tokens.size() < 2) {
-        printf("No task number\n");
+        printf("Error: No task number\n");
     } else if (tokens.size() > 2) {
-        printf("Too many args\n");
+        printf("Error: Too many args\n");
     } else {
         // if the given task number is less than all current tasks 
         // it will send the continue signal and stop the task otherwise
@@ -246,9 +246,9 @@ void continueTask(vector<string> &tokens) {
 void terminate(vector<string> &tokens) {
     // checks and makes the input is proper
     if (tokens.size() < 2) {
-        printf("No task number\n");
+        printf("Error: No task number\n");
     } else if (tokens.size() > 2) {
-        printf("Too many args\n");
+        printf("Error: Too many args\n");
     } else {
         // if the given task number is less than all current tasks 
         // it will send the kill signal if the task is currently 
