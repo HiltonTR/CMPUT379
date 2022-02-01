@@ -266,7 +266,8 @@ void terminate(vector<string> &tokens) {
             }
             kill(allTasks.at(taskNo).pid, SIGKILL);
             allTasks.at(taskNo).running = false;
-            printf("Terminated task: %i\n", taskNo);
+            printf("%i: (pid= %i, cmd=%s) terminated\n", taskNo, 
+            allTasks.at(taskNo).pid, allTasks.at(taskNo).cmd.c_str());
         } else {
             printf("Error: Can't find task: %i - not terminating\n", taskNo);
         }
