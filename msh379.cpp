@@ -16,6 +16,10 @@
 #    
 #     File comes with a makefile and can be compiled by running make all
 #     then ./msh379 to run.
+#     
+#     TO RUN PROGRAMS WITHOUT ./ DO:
+#       PATH=$PATH:.
+#       source ~/.bashrc
 #
 #     Everything else will be detailed in the report.
 #
