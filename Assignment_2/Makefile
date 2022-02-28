@@ -10,3 +10,6 @@ tar:
 
 clean:
 	rm -f *~ out.* *.o
+
+fifo:
+	rm fifo*

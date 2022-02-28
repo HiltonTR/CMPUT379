@@ -35,9 +35,11 @@ void controller(int num_of_switch) {
 
     cout << "checkpoint 2" << endl;
     // init fifo
-    for (int i = 1; i < num_of_switch; i++) {
+    for (int i = 0; i < num_of_switch; i++) {
         string inFifo = get_fifo(i+1, 0);
         string outFifo = get_fifo(0, i+1);
+        cout << inFifo << endl;
+        cout << outFifo << endl;
 
         mkfifo(inFifo.c_str(),
             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
@@ -63,15 +65,16 @@ void controller(int num_of_switch) {
         Session session = {inFifo, outFifo, inFd, outFd, 0};
         sessions.push_back(session);
 
-        pfd[i].fd = inFd;
-        pfd[i].events = POLLIN;
+        pfd[i+1].fd = inFd;
+        pfd[i+1].events = POLLIN;
+        pfd[i+1].revents = 0;
     }
 
     cout << "checkpoint 3" << endl;
 
     while(true) {
         
-        poll(pfd, num_of_switch + 1, 1);
+        poll(pfd, num_of_switch + 1, 0);
         char buffer[MAXBUF];
         if (errno) {
             printf("ERROR: Poll failure\n");
@@ -85,7 +88,7 @@ void controller(int num_of_switch) {
             }
             string cmd = string(buffer);
             while (!cmd.empty() && !isalpha(cmd.back())) cmd.pop_back();
-
+            cout << cmd << endl;
 
             if (cmd == "info") {
                 printInfo();

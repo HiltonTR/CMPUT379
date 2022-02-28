@@ -20,21 +20,25 @@ int main(int argc, char *argv[]) {
         controller(stoi(argv[2]));
 
     } else if (string(argv[1]).find("psw") != string::npos && argc == 6) {
-      
+
         int switchID = stoi(string(argv[1]).substr(3));
-        
+
         int pswj = -1;
         int pswk = -1;
 
         if (argv[3] != string("null")){
-            pswj = stoi(string(argv[3]).substr(2)); //
+            pswj = stoi(string(argv[3]).substr(3,1)); //
         }
+
         if (argv[4] != string("null")){
-            pswk = stoi(string(argv[4]).substr(2)); //
+            pswk = stoi(string(argv[4]).substr(3,1)); //
         } 
 
+        //cout << pswj << " " << pswk << endl;
+
         IPs ip_range = split_ip(argv[5]);
-        cout << "asdf" << endl;
+        
+        //cout << "asdf" << endl;
 
         masterSwitch(switchID, pswj, pswk, argv[2], ip_range);
 
@@ -73,7 +77,11 @@ string action_type_tostring(ActionType type) {
 void send_message(int fd, PktType type, string message) {
     char buffer[message.length() + 1];
     strcpy(buffer, message.c_str());
-    write(fd, buffer, sizeof(buffer));
+    if(write(fd, buffer, sizeof(buffer)) < 0) {
+        printf("error");
+    } else {
+        cout << "succceded" << endl;
+    }
 }
 
 vector<string> parse_message(string message) {
