@@ -127,6 +127,7 @@ void masterSwitch(int sid, int pswj, int pswk, string traffic_file, IPs ip_range
             char buffer[MAXBUF];
             read(switch_sessions[i].inFd, buffer, MAXBUF);
             switch_incoming_message_handler(parse_message(string(buffer)));
+            cout << "here4" << endl;
         }
         }
     }
@@ -142,11 +143,14 @@ void switch_incoming_message_handler(vector<string> message) {
             cout << "Received: (src= cont) [ADD]" << endl;
             if (message.size() == 3) {
             // not found
+            cout << "test0" << endl;
             add_drop_rule(stoi(message[2]));
             } else if (message.size() == 6) {
             // update flow table and relay packet
+            cout << "test1" << endl;
             int forwarding_port = stoi(message[2]) == switchID ? 2 : 1;
             int flow_table_idx = add_forward_rule(forwarding_port, { stoi(message[4]), stoi(message[5]) });
+            cout << "test2" << endl;
             int session_idx = find_matching_session(forwarding_port);
             stringstream ss;
             ss << "RELAY " << switchID;
@@ -161,8 +165,11 @@ void switch_incoming_message_handler(vector<string> message) {
             flow_table[0].pkt_count += 1;
             break;
         case HELLO_ACK:
+            cout << "here" << endl;
             cout << "Received: (src= cont) [HELLO_ACK]" << endl;
+            cout << "here2" << endl;
             switch_mode = MODE_CONNECTED;
+            cout << "here3" << endl;
             break;
         }
     }
@@ -375,7 +382,11 @@ TrafficRule parse_traffic_rule(string line) {
         vector<string> placeholder {
         sregex_token_iterator(line.begin(), line.end(), ws_re, -1), {}
         };
-        rule.switchID = stoi(placeholder[0].substr(2));
+        cout << "parse_traffic_here" << endl;  
+        cout << placeholder[0].substr(3) << endl;
+        cout << placeholder[1] << endl;
+        cout << placeholder[2] << endl;
+        rule.switchID = stoi(placeholder[0].substr(3));
         rule.src_ip = stoi(placeholder[1]);
         rule.dest_ip = stoi(placeholder[2]);
     }
@@ -392,7 +403,8 @@ vector<TrafficRule> parse_traffic_file(string traffic_file) {
         vector<string> placeholder {
             sregex_token_iterator(buffer.begin(), buffer.end(), ws_re, -1), {}
         };
-        rules.push_back({
+        cout << "parse_traffic_here2" << endl;   
+        rules.push_back({        
             stoi(placeholder[0].substr(2)),
             stoi(placeholder[1]),
             stoi(placeholder[2])
