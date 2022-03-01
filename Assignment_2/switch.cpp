@@ -103,14 +103,16 @@ void masterSwitch(int sid, int pswj, int pswk, string traffic_file, IPs ip_range
 
         // STDIN
         if (pfd[0].revents & POLLIN) {
-            char buffer[1024];
-            ssize_t cmdin = read(0, buffer, MAXBUF);
-            if (!cmdin) {
-                    printf("stdin is closed.\n");
-                }
-            string cmd = string(buffer);
-            while (!cmd.empty() && !isalpha(cmd.back())) cmd.pop_back();
-
+            //char buffer[1024];
+            //ssize_t cmdin = read(0, buffer, MAXBUF);
+            //if (!cmdin) {
+            //       printf("stdin is closed.\n");
+            //    }
+            //string cmd = string(buffer);
+            //while (!cmd.empty() && !isalpha(cmd.back())) cmd.pop_back();
+            string cmd;
+            cin >> cmd;
+            cout << cmd << endl;
             if (cmd == "info") {
                 switch_list_handler();
             } else if (cmd == "exit") {
