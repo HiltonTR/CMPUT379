@@ -83,13 +83,13 @@ void controller(int num_of_switch) {
 
         if (pfd[0].revents & POLLIN) {
             //ssize_t cmdin = read(pfd[0].fd, buffer, MAXBUF);
-            string cmd;
-            cin >> cmd;
             //if (!cmdin) {
             //    printf("stdin is closed.\n");
             //}
             //string cmd = string(buffer);
             //while (!cmd.empty() && !isalpha(cmd.back())) cmd.pop_back();
+            string cmd;
+            cin >> cmd;
             cout << cmd << endl;
 
             if (cmd == "info") {
