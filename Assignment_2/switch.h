@@ -14,7 +14,7 @@ struct TrafficRule {
 struct FlowTableEntry {
   IPs src_range;
   IPs dest_range;
-  ActionType action_type;
+  ActionType actionType;
   int action_value; // the switch port to which the packet should be forwarded
   int pkt_count; // packet count
 };
@@ -27,19 +27,18 @@ typedef enum {
 
 extern int switchID;
 
-void masterSwitch(int, int, int, std::string, IPs);
-std::vector<FlowTableEntry> init_flow_table(IPs);
-std::vector<Session> init_session(int, int, int);
+void masterSwitch(int, int, int, string, IPs);
+vector<FlowTableEntry> init_flow_table(IPs);
+vector<Session> init_session(int, int, int);
 void switch_exit_handler();
 void switch_list_handler();
 void print_flow_table();
 void send_open_to_controller(int, int, int);
 PacketInfo init_switch_stats();
 void print_switch_stats();
-std::vector<TrafficRule> parse_traffic_file(std::string);
-void switch_incoming_message_handler(std::vector<std::string>);
-std::vector<std::string> cache_traffic_file(std::string);
-TrafficRule parse_traffic_rule(std::string);
+void switch_incoming_message_handler(vector<string>);
+vector<string> cache_traffic_file(string);
+TrafficRule parse_traffic_rule(string);
 void add_drop_rule(int);
 int add_forward_rule(int, IPs);
 int find_matching_rule(int);

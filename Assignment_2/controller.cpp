@@ -22,32 +22,25 @@ PacketInfo stats = {
 
 
 void controller(int num_of_switch) {
-    cout << "checkpoint 1" << endl;
 
     pollfd pfd[num_of_switch + 2];
 
-    controllerInfo = init_controllerInfo();
+    controllerInfo = stats;
 
     // non-blocking I/O polling from STDIN
     pfd[0].fd = STDIN_FILENO;
     pfd[0].events = POLLIN;
     pfd[0].revents = 0;
 
-    cout << "checkpoint 2" << endl;
     // init fifo
     for (int i = 0; i < num_of_switch; i++) {
         string inFifo = get_fifo(i+1, 0);
         string outFifo = get_fifo(0, i+1);
-        cout << inFifo << endl;
-        cout << outFifo << endl;
-
-        mkfifo(inFifo.c_str(),
-            S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+        mkfifo(inFifo.c_str(), 0666);
         if (errno) perror("Error: Could not create a FIFO connection.\n");
         errno = 0;
 
-        mkfifo(outFifo.c_str(),
-            S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+        mkfifo(outFifo.c_str(), 0666);
         if (errno) perror("Error: Could not create a FIFO connection.\n");
         errno = 0;
 
@@ -60,7 +53,6 @@ void controller(int num_of_switch) {
         if (errno) perror("Error: Could not open FIFO.\n");
         errno = 0;      
 
-        //cout << inFd << " " << outFd << endl;
 
         Session session = {inFifo, outFifo, inFd, outFd, 0};
         sessions.push_back(session);
@@ -70,45 +62,38 @@ void controller(int num_of_switch) {
         pfd[i+1].revents = 0;
     }
 
-    cout << "checkpoint 3" << endl;
 
     while(true) {
         
         poll(pfd, num_of_switch + 1, 0);
         char buffer[MAXBUF];
-        if (errno) {
-            printf("ERROR: Poll failure\n");
-            exit(errno);
-        }
-
         if (pfd[0].revents & POLLIN) {
-            //ssize_t cmdin = read(pfd[0].fd, buffer, MAXBUF);
-            //if (!cmdin) {
-            //    printf("stdin is closed.\n");
-            //}
-            //string cmd = string(buffer);
-            //while (!cmd.empty() && !isalpha(cmd.back())) cmd.pop_back();
+
             string cmd;
             cin >> cmd;
-            cout << cmd << endl;
-
             if (cmd == "info") {
                 printInfo();
             } else if (cmd == "exit") {
                 printInfo();
                 exit(0);
             } else {
-                printf("Error: Unrecognized command. Please use info or exit.\n");
+                printf("Not a command. Use info or exit.\n");
             }         
         }
 
     for (int i = 0; i < num_of_switch; i++) {
         if (pfd[i+1].revents & POLLIN) {
         char buffer[MAXBUF];
-        cout << "[cont] Reading from " << sessions[i].inFifo << endl;
         read(sessions[i].inFd, buffer, MAXBUF);
-        vector<string> message = parse_message(string(buffer)); // change
-        controller_incoming_message_handler(message); // change
+        string s = string(buffer);
+        stringstream ss(s);
+        vector<string> placeholder;
+        string buf;
+
+        while (getline(ss, buf, ' ')) {
+            placeholder.push_back(buf);
+        }
+        controller_incoming_message_handler(placeholder); // change
         }
     }
     }
@@ -117,8 +102,7 @@ void controller(int num_of_switch) {
 void printInfo() {
     printf("Switch information: \n");
     for (auto s: switches) {
-        printf("HELLO");
-        printf("[sw%i]: port1= %i, port2= %i, ipranges= %i-%i\n", s.switchID,
+        printf("[psw%i]: port1= %i, port2= %i, port3= %i-%i\n", s.switchID,
            s.port1, s.port2, s.ipranges.low, s.ipranges.high);
     }
     printf("\n");
@@ -171,8 +155,7 @@ void transmittedInfo() {
 
 void controller_incoming_message_handler(vector<string> message) {
     string type = message[0];
-    cout << "Received: (src= sw" << message[1] << ", dest= cont) [" << message[0] << "]" << endl;
-    
+    cout << "Received: (src= master, dest= sw" << message[1] <<") [" << message[0] << "]" << endl;
     if (type == "HELLO") {
     controllerInfo.received[HELLO] += 1;
     int switchID = stoi(message[1]);
@@ -207,17 +190,5 @@ void controller_incoming_message_handler(vector<string> message) {
 
 
 
-// may not be needed
-void controller_exit_handler(vector<Session> sessions) {
-    for (auto session : sessions) {
-    close(session.inFd);
-    close(session.outFd);
-    }
-    exit(EXIT_SUCCESS);
-}
-
-PacketInfo init_controllerInfo() {
-    return stats;
-}
 
 

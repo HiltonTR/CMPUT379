@@ -14,7 +14,6 @@ void receivedInfo();
 void transmittedInfo();
 
 void send_open_to_controller();
-PacketInfo init_controllerInfo();
 void controller_incoming_message_handler(vector<string>);
 Switch find_switch_by_ip(int);
 

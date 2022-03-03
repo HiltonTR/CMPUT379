@@ -21,7 +21,6 @@ typedef enum {
 } CMDType;
 
 typedef enum {
-  ACTION_DELIVER,
   FORWARD,
   DROP
 } ActionType;
@@ -41,8 +40,8 @@ struct IPs {
 };
 
 struct Session {
-  std::string inFifo;
-  std::string outFifo;
+  string inFifo;
+  string outFifo;
   int inFd;
   int outFd;
   int port;
@@ -50,12 +49,12 @@ struct Session {
 
 struct Packet {
   PktType type;
-  std::string meesage;
+  string meesage;
 };
 
 struct PacketInfo {
-  std::map<PktType, int> received;
-  std::map<PktType, int> transmitted;
+  map<PktType, int> received;
+  map<PktType, int> transmitted;
 };
 
 struct Switch {
@@ -65,11 +64,12 @@ struct Switch {
   IPs ipranges;
 };
 
-vector<string> parse_message(string);
 IPs split_ip(string);
+
 string get_fifo(int, int);
+
 void send_message(int, PktType, string);
-string action_type_tostring(ActionType);
+
 
 
 #endif

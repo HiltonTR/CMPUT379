@@ -24,12 +24,12 @@ PacketInfo switch_stats;
 Mode switch_mode = MODE_DISCONNECTED;
 
 map<string, PktType> name_pkt_map = {
-  { "HELLO", HELLO },
-  { "HELLO_ACK", HELLO_ACK },
-  { "ASK", ASK },
-  { "ADD", ADD },
-  { "RELAY", RELAYIN },
-  { "ADMIT", ADMIT }
+    { "HELLO", HELLO },
+    { "HELLO_ACK", HELLO_ACK },
+    { "ASK", ASK },
+    { "ADD", ADD },
+    { "RELAY", RELAYIN },
+    { "ADMIT", ADMIT }
 };
 
 /*
@@ -45,7 +45,6 @@ void masterSwitch(int sid, int pswj, int pswk, string traffic_file, IPs ip_range
     pollfd pfd[switch_sessions.size() + 1];
     flow_table = init_flow_table(ip_range);
     switch_stats = init_switch_stats();
-    // vector<TrafficRule> traffic_rule = parse_traffic_file(traffic_file);
     vector<string> traffic_file_cache = cache_traffic_file(traffic_file);
 
     // non-blocking I/O polling from STDIN
@@ -64,12 +63,7 @@ void masterSwitch(int sid, int pswj, int pswk, string traffic_file, IPs ip_range
     while (true) {
         // fflush(stdout);
         // IO multiplexing
-        int ret = poll(pfd, switch_sessions.size() + 1, 1);
-
-        if (ret < 0) {
-        cout << "Failed to poll" << endl;
-        exit(EXIT_FAILURE);
-        }
+        poll(pfd, switch_sessions.size() + 1, 1);
 
         // read traffic file
         if (rule_cnt < traffic_file_cache.size() && switch_mode == MODE_CONNECTED) {
@@ -103,23 +97,15 @@ void masterSwitch(int sid, int pswj, int pswk, string traffic_file, IPs ip_range
 
         // STDIN
         if (pfd[0].revents & POLLIN) {
-            //char buffer[1024];
-            //ssize_t cmdin = read(0, buffer, MAXBUF);
-            //if (!cmdin) {
-            //       printf("stdin is closed.\n");
-            //    }
-            //string cmd = string(buffer);
-            //while (!cmd.empty() && !isalpha(cmd.back())) cmd.pop_back();
             string cmd;
             cin >> cmd;
-            cout << cmd << endl;
             if (cmd == "info") {
                 switch_list_handler();
             } else if (cmd == "exit") {
                 switch_list_handler();
                 exit(0);
             } else {
-                printf("Error: Unrecognized command. Please use info or exit.\n");
+                printf("Not a command. Use info or exit.\n");
             } 
         }
 
@@ -128,8 +114,15 @@ void masterSwitch(int sid, int pswj, int pswk, string traffic_file, IPs ip_range
         if (pfd[i+1].revents & POLLIN) {
             char buffer[MAXBUF];
             read(switch_sessions[i].inFd, buffer, MAXBUF);
-            switch_incoming_message_handler(parse_message(string(buffer)));
-            cout << "here4" << endl;
+            string s = string(buffer);
+            stringstream ss(s);
+            vector<string> temp;
+            string buf;
+
+            while (getline(ss, buf, ' ')) {
+                temp.push_back(buf);
+            }
+            switch_incoming_message_handler(temp);
         }
         }
     }
@@ -142,17 +135,14 @@ void switch_incoming_message_handler(vector<string> message) {
 
         switch (type) {
         case ADD:
-            cout << "Received: (src= cont) [ADD]" << endl;
+            cout << "Received: (src= master, dest= sw" << message[1] << ") [ADD]" << endl;
             if (message.size() == 3) {
             // not found
-            cout << "test0" << endl;
             add_drop_rule(stoi(message[2]));
             } else if (message.size() == 6) {
             // update flow table and relay packet
-            cout << "test1" << endl;
             int forwarding_port = stoi(message[2]) == switchID ? 2 : 1;
             int flow_table_idx = add_forward_rule(forwarding_port, { stoi(message[4]), stoi(message[5]) });
-            cout << "test2" << endl;
             int session_idx = find_matching_session(forwarding_port);
             stringstream ss;
             ss << "RELAY " << switchID;
@@ -167,11 +157,8 @@ void switch_incoming_message_handler(vector<string> message) {
             flow_table[0].pkt_count += 1;
             break;
         case HELLO_ACK:
-            cout << "here" << endl;
-            cout << "Received: (src= cont) [HELLO_ACK]" << endl;
-            cout << "here2" << endl;
+            cout << "Received: (src= master, dest= sw" << message[1] << ") [HELLO_ACK]" << endl;
             switch_mode = MODE_CONNECTED;
-            cout << "here3" << endl;
             break;
         }
     }
@@ -243,17 +230,15 @@ void send_open_to_controller(int sid, int pswj, int pswk) {
 
     return flow_table;
 }
-
+//https://www.ibm.com/docs/en/aix/7.2?topic=m-mkfifo-command for flags
 vector<Session> init_session(int switchID, int left, int right) {
     string inFifo = get_fifo(0, switchID);
     string outFifo = get_fifo(switchID, 0);
-    mkfifo(inFifo.c_str(),
-        S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+    mkfifo(inFifo.c_str(), 0666);
     if (errno) perror("Error: Could not create a FIFO connection.\n");
     errno = 0;
 
-    mkfifo(outFifo.c_str(),
-        S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+    mkfifo(outFifo.c_str(), 0666);
     if (errno) perror("Error: Could not create a FIFO connection.\n");
     errno = 0;
 
@@ -295,9 +280,7 @@ vector<Session> init_session(int switchID, int left, int right) {
 }
 
 void switch_list_handler() {
-    cout << "" << endl;
     print_flow_table();
-    cout << "" << endl;
     print_switch_stats();
 }
 
@@ -305,9 +288,15 @@ void print_flow_table() {
     cout << "Forwarding table:" << endl;
     int i = 0;
     for (auto entry : flow_table) {
+        string action;
+        if (entry.actionType == FORWARD){
+            action = "FORWARD";
+        } else if (entry.actionType == DROP){
+            action = "DROP";
+        }
         printf("[%i] (srcIp= %i-%i, destIp= %i-%i, ", i,  entry.src_range.low ,
             entry.src_range.high, entry.dest_range.low, entry.dest_range.high);
-        printf("action= %s:%i, pktCount= %i)\n", action_type_tostring(entry.action_type).c_str(),
+        printf("action= %s:%i, pktCount= %i)\n", action.c_str(),
             entry.action_value, entry.pkt_count);
 
         i++;
@@ -316,8 +305,8 @@ void print_flow_table() {
 
 void print_switch_stats() {
     cout << "Packet Stats:" << endl;
-    string received = "Received: ";
-    string transmitted = "Transmitted: ";
+    string received = "\tReceived: ";
+    string transmitted = "\tTransmitted: ";
 
     int counter = 0;
     for (auto stat : switch_stats.received) {
@@ -350,14 +339,6 @@ void print_switch_stats() {
     cout << transmitted << endl;
 }
 
-void switch_exit_handler() {
-    for (auto session : switch_sessions) {
-        close(session.inFd);
-        close(session.outFd);
-    }
-    exit(EXIT_SUCCESS);
-}
-
 PacketInfo init_switch_stats() {
     PacketInfo stats = {
         { {ADMIT, 0}, {HELLO_ACK, 0}, {ADD, 0}, {RELAYIN, 0} },
@@ -384,34 +365,13 @@ TrafficRule parse_traffic_rule(string line) {
         vector<string> placeholder {
         sregex_token_iterator(line.begin(), line.end(), ws_re, -1), {}
         };
-        cout << "parse_traffic_here" << endl;  
-        cout << placeholder[0].substr(3) << endl;
-        cout << placeholder[1] << endl;
-        cout << placeholder[2] << endl;
+        //cout << "parse_traffic_here" << endl;  
+        //cout << placeholder[0].substr(3) << endl;
+        //cout << placeholder[1] << endl;
+        //cout << placeholder[2] << endl;
         rule.switchID = stoi(placeholder[0].substr(3));
         rule.src_ip = stoi(placeholder[1]);
         rule.dest_ip = stoi(placeholder[2]);
     }
     return rule;
-}
-
-vector<TrafficRule> parse_traffic_file(string traffic_file) {
-    vector<TrafficRule> rules;
-    ifstream file(traffic_file);
-    string buffer;
-    while (getline(file, buffer)) {
-        if (buffer.find("#") == string::npos && !buffer.empty()) {
-        regex ws_re("\\s+");
-        vector<string> placeholder {
-            sregex_token_iterator(buffer.begin(), buffer.end(), ws_re, -1), {}
-        };
-        cout << "parse_traffic_here2" << endl;   
-        rules.push_back({        
-            stoi(placeholder[0].substr(2)),
-            stoi(placeholder[1]),
-            stoi(placeholder[2])
-        });
-        }
-    }
-    return rules;
 }
