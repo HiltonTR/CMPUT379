@@ -70,6 +70,4 @@ string get_fifo(int, int);
 
 void send_message(int, PktType, string);
 
-
-
 #endif

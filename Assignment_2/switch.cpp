@@ -18,7 +18,7 @@ int switchID;
 // int pswj;
 // int pswk;
 vector<Session> switch_sessions;
-vector<FlowTableEntry> flow_table;
+vector<ft> forwardingTable;
 
 PacketInfo switch_stats;
 Mode switch_mode = MODE_DISCONNECTED;
@@ -43,7 +43,7 @@ void masterSwitch(int sid, int pswj, int pswk, string traffic_file, IPs ip_range
     switch_sessions = init_session(switchID, pswj, pswk);
 
     pollfd pfd[switch_sessions.size() + 1];
-    flow_table = init_flow_table(ip_range);
+    forwardingTable = init_forwardingTable(ip_range);
     switch_stats = init_switch_stats();
     vector<string> traffic_file_cache = cache_traffic_file(traffic_file);
 
@@ -70,17 +70,17 @@ void masterSwitch(int sid, int pswj, int pswk, string traffic_file, IPs ip_range
         TrafficRule rule = parse_traffic_rule(traffic_file_cache[rule_cnt]);
         if (rule.switchID == switchID && ip_range.low <= rule.dest_ip && rule.dest_ip <= ip_range.high) {
             // found match in flow table, admit packet
-            flow_table[0].pkt_count += 1;
+            forwardingTable[0].pkt_count += 1;
             switch_stats.received[ADMIT] += 1;
         } else if (rule.switchID == switchID) {
             switch_stats.received[ADMIT] += 1;
             int rule_index = find_matching_rule(rule.dest_ip);
             if (rule_index > 0) {
             // find matched rule send relay message
-            int session_idx = find_matching_session(flow_table[rule_index].action_value);
+            int session_idx = find_matching_session(forwardingTable[rule_index].action_value);
             stringstream ss;
             ss << "RELAY " << switchID;
-            flow_table[rule_index].pkt_count += 1;
+            forwardingTable[rule_index].pkt_count += 1;
             switch_stats.transmitted[RELAYIN] += 1;
             send_message(switch_sessions[session_idx].outFd, RELAYIN, ss.str());
             } else {
@@ -142,19 +142,19 @@ void switch_incoming_message_handler(vector<string> message) {
             } else if (message.size() == 6) {
             // update flow table and relay packet
             int forwarding_port = stoi(message[2]) == switchID ? 2 : 1;
-            int flow_table_idx = add_forward_rule(forwarding_port, { stoi(message[4]), stoi(message[5]) });
+            int forwardingTable_idx = add_forward_rule(forwarding_port, { stoi(message[4]), stoi(message[5]) });
             int session_idx = find_matching_session(forwarding_port);
             stringstream ss;
             ss << "RELAY " << switchID;
             if (session_idx > 0) send_message(switch_sessions[session_idx].outFd, RELAYIN, ss.str());
             switch_stats.transmitted[RELAYIN] += 1;
-            flow_table[flow_table_idx].pkt_count += 1;
+            forwardingTable[forwardingTable_idx].pkt_count += 1;
             }
             switch_mode = MODE_CONNECTED;
             break;
         case RELAYIN:
             cout << "Received: (src= sw" << message[1] << ") [RELAY]" << endl;
-            flow_table[0].pkt_count += 1;
+            forwardingTable[0].pkt_count += 1;
             break;
         case HELLO_ACK:
             cout << "Received: (src= master, dest= sw" << message[1] << ") [HELLO_ACK]" << endl;
@@ -165,18 +165,18 @@ void switch_incoming_message_handler(vector<string> message) {
 }
 
 int add_forward_rule(int port, IPs dest) {
-    flow_table.push_back({
+    forwardingTable.push_back({
         { 0, MAXIP },
         { dest.low, dest.high },
         FORWARD,
         port,
         0
     });
-    return flow_table.size() - 1;
+    return forwardingTable.size() - 1;
 }
 
 void add_drop_rule(int ip) {
-    flow_table.push_back({
+    forwardingTable.push_back({
         { 0, MAXIP },
         { ip, ip },
         DROP,
@@ -188,7 +188,7 @@ void add_drop_rule(int ip) {
 int find_matching_rule(int dest_ip) {
     int i = 0;
     int result_index = -1;
-    for (auto entry : flow_table) {
+    for (auto entry : forwardingTable) {
         if (entry.dest_range.low <= dest_ip && dest_ip <= entry.dest_range.high) {
         result_index = i;
         break;
@@ -214,13 +214,13 @@ int find_matching_session(int port) {
 void send_open_to_controller(int sid, int pswj, int pswk) {
     stringstream ss;
     ss << "HELLO" << " " << sid << " " << pswj << " " << pswk << " " <<
-    flow_table[0].dest_range.low << " " << flow_table[0].dest_range.high;
+    forwardingTable[0].dest_range.low << " " << forwardingTable[0].dest_range.high;
     send_message(switch_sessions[0].outFd, HELLO, ss.str());
     switch_stats.transmitted[HELLO] += 1;
     }
 
-    vector<FlowTableEntry> init_flow_table(IPs ip_range) {
-    vector<FlowTableEntry> flow_table = {{
+    vector<ft> init_forwardingTable(IPs ip_range) {
+    vector<ft> forwardingTable = {{
         { 0, MAXIP },
         { ip_range.low, ip_range.high },
         FORWARD,
@@ -228,7 +228,7 @@ void send_open_to_controller(int sid, int pswj, int pswk) {
         0
     }};
 
-    return flow_table;
+    return forwardingTable;
 }
 //https://www.ibm.com/docs/en/aix/7.2?topic=m-mkfifo-command for flags
 vector<Session> init_session(int switchID, int left, int right) {
@@ -280,14 +280,14 @@ vector<Session> init_session(int switchID, int left, int right) {
 }
 
 void switch_list_handler() {
-    print_flow_table();
+    print_forwardingTable();
     print_switch_stats();
 }
 
-void print_flow_table() {
+void print_forwardingTable() {
     cout << "Forwarding table:" << endl;
     int i = 0;
-    for (auto entry : flow_table) {
+    for (auto entry : forwardingTable) {
         string action;
         if (entry.actionType == FORWARD){
             action = "FORWARD";

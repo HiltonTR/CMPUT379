@@ -14,7 +14,7 @@ void receivedInfo();
 void transmittedInfo();
 
 void send_open_to_controller();
-void controller_incoming_message_handler(vector<string>);
+void controllerReceive(vector<string>);
 Switch find_switch_by_ip(int);
 
 #endif

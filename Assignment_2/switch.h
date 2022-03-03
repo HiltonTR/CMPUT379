@@ -11,7 +11,7 @@ struct TrafficRule {
   int dest_ip;
 };
 
-struct FlowTableEntry {
+struct ft {
   IPs src_range;
   IPs dest_range;
   ActionType actionType;
@@ -28,11 +28,10 @@ typedef enum {
 extern int switchID;
 
 void masterSwitch(int, int, int, string, IPs);
-vector<FlowTableEntry> init_flow_table(IPs);
+vector<ft> init_forwardingTable(IPs);
 vector<Session> init_session(int, int, int);
-void switch_exit_handler();
 void switch_list_handler();
-void print_flow_table();
+void print_forwardingTable();
 void send_open_to_controller(int, int, int);
 PacketInfo init_switch_stats();
 void print_switch_stats();

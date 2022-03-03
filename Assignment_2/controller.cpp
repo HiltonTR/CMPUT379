@@ -87,13 +87,13 @@ void controller(int num_of_switch) {
         read(sessions[i].inFd, buffer, MAXBUF);
         string s = string(buffer);
         stringstream ss(s);
-        vector<string> placeholder;
+        vector<string> temp;
         string buf;
 
         while (getline(ss, buf, ' ')) {
-            placeholder.push_back(buf);
+            temp.push_back(buf);
         }
-        controller_incoming_message_handler(placeholder); // change
+        controllerReceive(temp); // change
         }
     }
     }
@@ -153,7 +153,7 @@ void transmittedInfo() {
 }
 
 
-void controller_incoming_message_handler(vector<string> message) {
+void controllerReceive(vector<string> message) {
     string type = message[0];
     cout << "Received: (src= master, dest= sw" << message[1] <<") [" << message[0] << "]" << endl;
     if (type == "HELLO") {
@@ -161,10 +161,10 @@ void controller_incoming_message_handler(vector<string> message) {
     int switchID = stoi(message[1]);
     int port1 = stoi(message[2]) <= 0 ? -1 : stoi(message[2]);
     int port2 = stoi(message[3]) <= 0 ? -1 : stoi(message[3]);
-    int port3_lo = stoi(message[4]);
-    int port3_hi = stoi(message[5]);
+    int port3low = stoi(message[4]);
+    int port3high = stoi(message[5]);
 
-    switches.push_back({ switchID, port1, port2, { port3_lo, port3_hi } });
+    switches.push_back({ switchID, port1, port2, { port3low, port3high } });
     send_message(sessions[switchID-1].outFd, HELLO_ACK, "HELLO_ACK 0");
     controllerInfo.transmitted[HELLO_ACK] += 1;
     } else if (type == "ASK") {
