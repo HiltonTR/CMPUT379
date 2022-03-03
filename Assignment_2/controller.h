@@ -8,13 +8,11 @@ using namespace std;
 
 void controller(int);
 
-void controller_exit_handler(vector<Session>);// may not be needed
 void printInfo();
 void receivedInfo();
 void transmittedInfo();
 
 void send_open_to_controller();
 void controllerReceive(vector<string>);
-Switch find_switch_by_ip(int);
 
 #endif

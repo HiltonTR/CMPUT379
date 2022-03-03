@@ -66,8 +66,8 @@ struct Switch {
 
 IPs split_ip(string);
 
-string get_fifo(int, int);
+string nameFifo(int, int);
 
-void send_message(int, PktType, string);
+void sendPacket(int, PktType, string);
 
 #endif

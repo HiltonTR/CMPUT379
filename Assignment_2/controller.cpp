@@ -34,8 +34,8 @@ void controller(int num_of_switch) {
 
     // init fifo
     for (int i = 0; i < num_of_switch; i++) {
-        string inFifo = get_fifo(i+1, 0);
-        string outFifo = get_fifo(0, i+1);
+        string inFifo = nameFifo(i+1, 0);
+        string outFifo = nameFifo(0, i+1);
         mkfifo(inFifo.c_str(), 0666);
         if (errno) perror("Error: Could not create a FIFO connection.\n");
         errno = 0;
@@ -165,7 +165,7 @@ void controllerReceive(vector<string> message) {
     int port3high = stoi(message[5]);
 
     switches.push_back({ switchID, port1, port2, { port3low, port3high } });
-    send_message(sessions[switchID-1].outFd, HELLO_ACK, "HELLO_ACK 0");
+    sendPacket(sessions[switchID-1].outFd, HELLO_ACK, "HELLO_ACK 0");
     controllerInfo.transmitted[HELLO_ACK] += 1;
     } else if (type == "ASK") {
     int switchID = stoi(message[1]);
@@ -182,7 +182,7 @@ void controllerReceive(vector<string> message) {
     }
     if (!if_found) ss << message[2];
     controllerInfo.transmitted[ADD] += 1;
-    send_message(sessions[switchID-1].outFd, ADD, ss.str());
+    sendPacket(sessions[switchID-1].outFd, ADD, ss.str());
     }
 }
 

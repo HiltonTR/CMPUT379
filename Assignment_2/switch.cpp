@@ -21,7 +21,7 @@ vector<Session> switch_sessions;
 vector<ft> forwardingTable;
 
 PacketInfo switch_stats;
-Mode switch_mode = MODE_DISCONNECTED;
+
 
 map<string, PktType> name_pkt_map = {
     { "HELLO", HELLO },
@@ -66,30 +66,26 @@ void masterSwitch(int sid, int pswj, int pswk, string traffic_file, IPs ip_range
         poll(pfd, switch_sessions.size() + 1, 1);
 
         // read traffic file
-        if (rule_cnt < traffic_file_cache.size() && switch_mode == MODE_CONNECTED) {
+        if (rule_cnt < traffic_file_cache.size()) {
         TrafficRule rule = parse_traffic_rule(traffic_file_cache[rule_cnt]);
         if (rule.switchID == switchID && ip_range.low <= rule.dest_ip && rule.dest_ip <= ip_range.high) {
-            // found match in flow table, admit packet
-            forwardingTable[0].pkt_count += 1;
+            forwardingTable[0].pktCount += 1;
             switch_stats.received[ADMIT] += 1;
         } else if (rule.switchID == switchID) {
             switch_stats.received[ADMIT] += 1;
             int rule_index = find_matching_rule(rule.dest_ip);
             if (rule_index > 0) {
-            // find matched rule send relay message
             int session_idx = find_matching_session(forwardingTable[rule_index].action_value);
             stringstream ss;
             ss << "RELAY " << switchID;
-            forwardingTable[rule_index].pkt_count += 1;
+            forwardingTable[rule_index].pktCount += 1;
             switch_stats.transmitted[RELAYIN] += 1;
-            send_message(switch_sessions[session_idx].outFd, RELAYIN, ss.str());
+            sendPacket(switch_sessions[session_idx].outFd, RELAYIN, ss.str());
             } else {
-            // send ASK to controller
             stringstream ss;
             ss << "ASK " << switchID << " " << rule.dest_ip;
             switch_stats.transmitted[ASK] += 1;
-            switch_mode = MODE_WAITINGADD;
-            send_message(switch_sessions[0].outFd, HELLO, ss.str());
+            sendPacket(switch_sessions[0].outFd, HELLO, ss.str());
             }
         }
         rule_cnt += 1;
@@ -122,13 +118,13 @@ void masterSwitch(int sid, int pswj, int pswk, string traffic_file, IPs ip_range
             while (getline(ss, buf, ' ')) {
                 temp.push_back(buf);
             }
-            switch_incoming_message_handler(temp);
+            switchReceive(temp);
         }
         }
     }
 }
 
-void switch_incoming_message_handler(vector<string> message) {
+void switchReceive(vector<string> message) {
     if (message.size() > 1) {
         PktType type = name_pkt_map[message[0]];
         switch_stats.received[type] += 1;
@@ -146,19 +142,17 @@ void switch_incoming_message_handler(vector<string> message) {
             int session_idx = find_matching_session(forwarding_port);
             stringstream ss;
             ss << "RELAY " << switchID;
-            if (session_idx > 0) send_message(switch_sessions[session_idx].outFd, RELAYIN, ss.str());
+            if (session_idx > 0) sendPacket(switch_sessions[session_idx].outFd, RELAYIN, ss.str());
             switch_stats.transmitted[RELAYIN] += 1;
-            forwardingTable[forwardingTable_idx].pkt_count += 1;
+            forwardingTable[forwardingTable_idx].pktCount += 1;
             }
-            switch_mode = MODE_CONNECTED;
-            break;
-        case RELAYIN:
-            cout << "Received: (src= sw" << message[1] << ") [RELAY]" << endl;
-            forwardingTable[0].pkt_count += 1;
             break;
         case HELLO_ACK:
             cout << "Received: (src= master, dest= sw" << message[1] << ") [HELLO_ACK]" << endl;
-            switch_mode = MODE_CONNECTED;
+            break;
+        case RELAYIN:
+            cout << "Received: (src= sw" << message[1] << ") [RELAY]" << endl;
+            forwardingTable[0].pktCount += 1;
             break;
         }
     }
@@ -215,7 +209,7 @@ void send_open_to_controller(int sid, int pswj, int pswk) {
     stringstream ss;
     ss << "HELLO" << " " << sid << " " << pswj << " " << pswk << " " <<
     forwardingTable[0].dest_range.low << " " << forwardingTable[0].dest_range.high;
-    send_message(switch_sessions[0].outFd, HELLO, ss.str());
+    sendPacket(switch_sessions[0].outFd, HELLO, ss.str());
     switch_stats.transmitted[HELLO] += 1;
     }
 
@@ -232,8 +226,8 @@ void send_open_to_controller(int sid, int pswj, int pswk) {
 }
 //https://www.ibm.com/docs/en/aix/7.2?topic=m-mkfifo-command for flags
 vector<Session> init_session(int switchID, int left, int right) {
-    string inFifo = get_fifo(0, switchID);
-    string outFifo = get_fifo(switchID, 0);
+    string inFifo = nameFifo(0, switchID);
+    string outFifo = nameFifo(switchID, 0);
     mkfifo(inFifo.c_str(), 0666);
     if (errno) perror("Error: Could not create a FIFO connection.\n");
     errno = 0;
@@ -258,20 +252,20 @@ vector<Session> init_session(int switchID, int left, int right) {
 
     if (left > 0) {
         sessions.push_back({
-        get_fifo(left, switchID), // in
-        get_fifo(switchID, left), // out
-        open(get_fifo(left, switchID).c_str(), O_RDWR | O_NONBLOCK),
-        open(get_fifo(switchID, left).c_str(), O_RDWR | O_NONBLOCK),
+        nameFifo(left, switchID), // in
+        nameFifo(switchID, left), // out
+        open(nameFifo(left, switchID).c_str(), O_RDWR | O_NONBLOCK),
+        open(nameFifo(switchID, left).c_str(), O_RDWR | O_NONBLOCK),
         1
         });
     }
 
     if (right > 0) {
         sessions.push_back({
-        get_fifo(right, switchID), // in
-        get_fifo(switchID, right), // out
-        open(get_fifo(right, switchID).c_str(), O_RDWR | O_NONBLOCK),
-        open(get_fifo(switchID, right).c_str(), O_RDWR | O_NONBLOCK),
+        nameFifo(right, switchID), // in
+        nameFifo(switchID, right), // out
+        open(nameFifo(right, switchID).c_str(), O_RDWR | O_NONBLOCK),
+        open(nameFifo(switchID, right).c_str(), O_RDWR | O_NONBLOCK),
         2
         });
     }
@@ -297,7 +291,7 @@ void print_forwardingTable() {
         printf("[%i] (srcIp= %i-%i, destIp= %i-%i, ", i,  entry.src_range.low ,
             entry.src_range.high, entry.dest_range.low, entry.dest_range.high);
         printf("action= %s:%i, pktCount= %i)\n", action.c_str(),
-            entry.action_value, entry.pkt_count);
+            entry.action_value, entry.pktCount);
 
         i++;
     }
@@ -313,7 +307,7 @@ void print_switch_stats() {
         stringstream ss;
         if (stat.first == ADMIT) ss << "ADMIT:" << stat.second;
         else if (stat.first == HELLO_ACK) ss << "HELLO_ACK:" << stat.second;
-        else if (stat.first == ADD) ss << "ADDRULE:" << stat.second;
+        else if (stat.first == ADD) ss << "ADD:" << stat.second;
         else if (stat.first == RELAYIN) ss << "RELAYIN:" << stat.second;
 
         if (counter != switch_stats.received.size() - 1) ss << ", ";
@@ -365,10 +359,6 @@ TrafficRule parse_traffic_rule(string line) {
         vector<string> placeholder {
         sregex_token_iterator(line.begin(), line.end(), ws_re, -1), {}
         };
-        //cout << "parse_traffic_here" << endl;  
-        //cout << placeholder[0].substr(3) << endl;
-        //cout << placeholder[1] << endl;
-        //cout << placeholder[2] << endl;
         rule.switchID = stoi(placeholder[0].substr(3));
         rule.src_ip = stoi(placeholder[1]);
         rule.dest_ip = stoi(placeholder[2]);

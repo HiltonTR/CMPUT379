@@ -56,12 +56,12 @@ IPs split_ip(string input) {
     return ip_range;
 }
 
-string get_fifo(int start, int end) {
+string nameFifo(int start, int end) {
     return "fifo-" + to_string(start) + "-" + to_string(end);
 }
 
 
-void send_message(int fd, PktType type, string message) {
+void sendPacket(int fd, PktType type, string message) {
     char buffer[message.length() + 1];
     strcpy(buffer, message.c_str());
     if(write(fd, buffer, sizeof(buffer)) < 0) {

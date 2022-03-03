@@ -16,14 +16,9 @@ struct ft {
   IPs dest_range;
   ActionType actionType;
   int action_value; // the switch port to which the packet should be forwarded
-  int pkt_count; // packet count
+  int pktCount; // packet count
 };
 
-typedef enum {
-  MODE_CONNECTED,
-  MODE_DISCONNECTED,
-  MODE_WAITINGADD
-} Mode;
 
 extern int switchID;
 
@@ -35,7 +30,7 @@ void print_forwardingTable();
 void send_open_to_controller(int, int, int);
 PacketInfo init_switch_stats();
 void print_switch_stats();
-void switch_incoming_message_handler(vector<string>);
+void switchReceive(vector<string>);
 vector<string> cache_traffic_file(string);
 TrafficRule parse_traffic_rule(string);
 void add_drop_rule(int);
