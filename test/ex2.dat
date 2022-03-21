@@ -1,0 +1,13 @@
+# Data file for a2w22
+# a2w22 master 2
+# a2w22 psw1 ex2.dat null psw2 100-110
+# a2w22 psw2 ex2.dat psw1 null 200-210
+psw1 100 102
+psw1 100 200
+psw1 100 300
+psw2 200 300
+psw3 200 300
+psw2 200 100
+psw2 200 100
+psw1 100 103
+psw1 100 104
