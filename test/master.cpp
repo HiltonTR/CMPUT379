@@ -74,7 +74,6 @@ void sendAddPacket(int numSwitches, pollfd pfds[], int fd, int destId, int actio
     string direction = "Transmitted";
     string type = "ADD";
     pair<string, vector<int>> parsedPacket = parsePacket(addString);
-    
     printPacketMessage(direction, 0, destId, type, parsedPacket.second);
 }
 
@@ -186,7 +185,7 @@ void MasterLoop(int numSwitches, int portNumber) {
             if (pfds[i].revents & POLLIN) {
                 // check connection
                 if (!read(pfds[i].fd, buffer, MAX_BUFFER)) {
-                printf("Warning: Connection to sw%d closed.\n", i);
+                printf("Lost connection to sw%d.\n", i);
                 close(pfds[i].fd);
                 closedSwitches.push_back(i);
                 //continue;
@@ -255,9 +254,7 @@ void MasterLoop(int numSwitches, int portNumber) {
                 }
 
                 counts.add++;
-                } else {
-                printf("Received %s packet. Ignored.\n", packetType.c_str());
-                }
+                } 
             }
         }   
 

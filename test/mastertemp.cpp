@@ -187,6 +187,24 @@ void MasterLoop(int numSwitches, int portNumber) {
                 //continue;
                 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                 string packet = string(buffer);
                 pair<string, vector<int>> receivedPacket = parsePacket(packet);
                 string packetType = get<0>(receivedPacket);
@@ -255,6 +273,24 @@ void MasterLoop(int numSwitches, int portNumber) {
                 }
             }
         }   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         memset(buffer, 0, sizeof(buffer)); // Clear buffer
 

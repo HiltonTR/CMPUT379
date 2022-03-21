@@ -53,75 +53,8 @@ typedef struct {
     int pktCount;
 } fowardRule;
 
-//https://www.geeksforgeeks.org/time-delay-c/
-bool isDelayed(long startTime, int duration) {
-  if (duration == 0) {
-    return false;
-  }
 
-  milliseconds currentTime = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
-  return currentTime.count() < (startTime + duration);
-}
-
-/**
- * Sends an OPEN packet to the master.
- */
-void sendOpenPacket(int fd, int id, int port1Id, int port2Id, int ipLow, int ipHigh) {
-  string openString = "HELLO:" + to_string(id) + "," + to_string(port1Id) + "," + to_string(port2Id)
-                      + "," + to_string(ipLow) + "," + to_string(ipHigh);
-  write(fd, openString.c_str(), strlen(openString.c_str()));
-  if (errno) {
-    perror("write() failure");
-    exit(errno);
-  }
-
-  // Log the successful transmission
-  string direction = "Transmitted";
-  string type = "HELLO";
-  pair<string, vector<int>> parsedPacket = parsePacket(openString);
-  printPacketMessage(direction, id, 0, type, parsedPacket.second);
-}
-
-/**
- * Send a ASK packet to the master.
- */
-void sendAskPacket(int fd, int srcId, int destId, int srcIp, int destIp) {
-  string askString = "ASK:" + to_string(srcIp) + "," + to_string(destIp);
-  write(fd, askString.c_str(), strlen(askString.c_str()));
-  if (errno) {
-    perror("write() failure");
-    exit(errno);
-  }
-
-  // Log the successful transmission
-  string direction = "Transmitted";
-  string type = "ASK";
-  pair<string, vector<int>> parsedPacket = parsePacket(askString);
-  printPacketMessage(direction, srcId, destId, type, parsedPacket.second);
-}
-
-/**
- * Send a relay packet to another switch.
- */
-void sendRelayPacket(int fd, int srcId, int destId, int srcIp, int destIp) {
-  string relayString = "RELAY:" + to_string(srcIp) + "," + to_string(destIp);
-  write(fd, relayString.c_str(), strlen(relayString.c_str()));
-  if (errno) {
-    perror("write() failure");
-    exit(errno);
-  }
-
-  // Log the successful transmission
-  string direction = "Transmitted";
-  string type = "RELAY";
-  pair<string, vector<int>> parsedPacket = parsePacket(relayString);
-  printPacketMessage(direction, srcId, destId, type, parsedPacket.second);
-}
-
-/**
- * Info the status information of the switch.
- */
-void switchInfo(vector<fowardRule> &fowardTable, SwitchPacketCounts &counts) {
+void printInfo(vector<fowardRule> &fowardTable, SwitchPacketCounts &counts) {
   printf("foward table:\n");
   int i = 0;
   for (auto &rule : fowardTable) {
@@ -145,49 +78,61 @@ void switchInfo(vector<fowardRule> &fowardTable, SwitchPacketCounts &counts) {
  */
 void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstream &in,
                 string &ipAddress, int portNumber) {
-  vector<fowardRule> fowardTable; // foward rule table
-  fowardTable.push_back({0, MAX_IP, ipLow, ipHigh, "FORWARD", 3, 0}); // Add initial rule
+    vector<fowardRule> fowardTable; // foward rule table
+    fowardTable.push_back({0, MAX_IP, ipLow, ipHigh, "FORWARD", 3, 0}); // Add initial rule
 
-  map<int, int> portToFd; // Map port number to FD
-  map<int, int> portToId; // Map port number to switch ID
+    map<int, int> portToFd; // Map port number to FD
+    map<int, int> portToId; // Map port number to switch ID
 
-  // Counts the number of each type of packet seen
-  SwitchPacketCounts counts = {0, 0, 0, 0, 0, 0, 0};
+    // Counts the number of each type of packet seen
+    SwitchPacketCounts counts = {0, 0, 0, 0, 0, 0, 0};
 
-  int socketIndex = PFDS_SIZE - 1;
+    int socketIndex = PFDS_SIZE - 1;
 
-  char buffer[MAX_BUFFER];
-  struct pollfd pfds[PFDS_SIZE];
+    char buffer[MAX_BUFFER];
+    struct pollfd pfds[PFDS_SIZE];
 
-  // Set up STDIN for polling from
-  pfds[0].fd = STDIN_FILENO;
-  pfds[0].events = POLLIN;
-  pfds[0].revents = 0;
+    // Set up STDIN for polling from
+    pfds[0].fd = STDIN_FILENO;
+    pfds[0].events = POLLIN;
+    pfds[0].revents = 0;
 
-  struct sockaddr_in server {};
+    struct sockaddr_in server {};
 
-  // Creating socket file descriptor
-  if ((pfds[socketIndex].fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-    perror("socket() failure");
-    exit(errno);
-  }
-  memset(&server, 0, sizeof(server));
+    // Creating socket file descriptor
+    if ((pfds[socketIndex].fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("socket() failure");
+        exit(errno);
+    }
+    memset(&server, 0, sizeof(server));
 
-  server.sin_family = AF_INET;
-  server.sin_port = htons(portNumber);
+    server.sin_family = AF_INET;
+    server.sin_port = htons(portNumber);
 
-  if (connect(pfds[socketIndex].fd, (struct sockaddr *) &server, sizeof(server)) < 0) {
-    perror("connect() failure");
-    exit(errno);
-  }
+    if (connect(pfds[socketIndex].fd, (struct sockaddr *) &server, sizeof(server)) < 0) {
+        perror("connect() failure");
+        exit(errno);
+    }
 
-  pair<int, int> masterToFd = make_pair(0, pfds[socketIndex].fd);
-  portToFd.insert(masterToFd);
-  pair<int, int> masterToId = make_pair(0, MASTER_ID);
-  portToId.insert(masterToId);
+    pair<int, int> masterToFd = make_pair(0, pfds[socketIndex].fd);
+    portToFd.insert(masterToFd);
+    pair<int, int> masterToId = make_pair(0, MASTER_ID);
+    portToId.insert(masterToId);
 
-  // Send an OPEN packet to the master
-  sendOpenPacket(pfds[socketIndex].fd, id, port1Id, port2Id, ipLow, ipHigh);
+    // Send an OPEN packet to the master
+
+    string openString = "HELLO:" + to_string(id) + "," + to_string(port1Id) + "," + to_string(port2Id)
+                        + "," + to_string(ipLow) + "," + to_string(ipHigh);
+    write(pfds[socketIndex].fd, openString.c_str(), strlen(openString.c_str()));
+
+    // Log the successful transmission
+    string direction = "Transmitted";
+    string type = "HELLO";
+    pair<string, vector<int>> parsedPacket = parsePacket(openString);
+    printPacketMessage(direction, id, 0, type, parsedPacket.second);
+
+
+
   counts.open++;
 
   // Set socket to non-blocking
@@ -220,8 +165,7 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
     }
 
   // Used to keep track of the delay interval of the switch
-  long delayStartTime = 0;
-  int delayDuration = 0;
+  int delay = 0;
 
   bool hello_ackReceived = false;
   bool addReceived = true; // Used to wait for master responses.
@@ -234,17 +178,16 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
      * yet). The switch ignores empty lines, comment lines, and lines specifying other handling
      * switches. A packet header is considered admitted if the line specifies the current switch.
      */
-    if (hello_ackReceived && addReceived && !isDelayed(delayStartTime, delayDuration)) {
+    if (hello_ackReceived && addReceived && delay==0) {
       // Reset delay variables
-      delayStartTime = 0;
-      delayDuration = 0;
+      delay = 0;
 
       pair<string, vector<int>> trafficInfo;
       string line;
       if (in.is_open()) {
         if (getline(in, line)) {
             string type;
-            vector<int> content;
+            vector<int> data;
 
             int id = 0;
             int srcIp = 0;
@@ -262,28 +205,28 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
                 if (tokens[0] != string("null")){
                     id = stoi(string(tokens[0]).substr(3,1)); //
                 }
-                content.push_back(id);
+                data.push_back(id);
 
                 if (tokens[1] == "delay") {
                 type = "delay";
                 int ms = (int) strtol(tokens[2].c_str(), (char **) nullptr, 10);
-                content.push_back(ms);
-                
+                data.push_back(ms);
+
                 } else {
                 type = "action";
 
                 srcIp = (int) strtol(tokens[1].c_str(), (char **) nullptr, 10);
-                content.push_back(srcIp);
+                data.push_back(srcIp);
 
                 destIp = (int) strtol(tokens[2].c_str(), (char **) nullptr, 10);
-                content.push_back(destIp);
+                data.push_back(destIp);
                 }
             }
 
           if (type == "action") {
-            int trafficId = content[0];
-            int srcIp = content[1];
-            int destIp = content[2];
+            int trafficId = data[0];
+            int srcIp = data[1];
+            int destIp = data[2];
 
             if (id == trafficId) {
               counts.admit++;
@@ -302,14 +245,19 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
                       if (!portToFd.count(rule.actionVal)) {
                         string relayFifo = makeFifoName(id, portToId[rule.actionVal]);
                         int portFd = open(relayFifo.c_str(), O_WRONLY | O_NONBLOCK);
-                        pair<int, int> portConn = make_pair(rule.actionVal, portFd);
-                        portToFd.insert(portConn);
+                        portToFd.insert(make_pair(rule.actionVal, portFd));
                       }
 
                       // Ensure switch is not closed before sending
                       if (find(closedPorts.begin(), closedPorts.end(), rule.actionVal) == closedPorts.end()) {
-                        sendRelayPacket(portToFd[rule.actionVal], id, portToId[rule.actionVal],
-                                        srcIp, destIp);
+                        string relayString = "RELAY:" + to_string(srcIp) + "," + to_string(destIp);
+                        write(portToFd[rule.actionVal], relayString.c_str(), strlen(relayString.c_str()));
+
+                        // Log the successful transmission
+                        string direction = "Transmitted";
+                        string type = "RELAY";
+                        pair<string, vector<int>> parsedPacket = parsePacket(relayString);
+                        printPacketMessage(direction, srcIp, destIp, type, parsedPacket.second);
                       }
 
                       counts.relayOut++;
@@ -321,31 +269,36 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
               }
 
               if (!found) {
-                sendAskPacket(portToFd[0], id, 0, srcIp, destIp);
+                string askString = "ASK:" + to_string(srcIp) + "," + to_string(destIp);
+                write(portToFd[0], askString.c_str(), strlen(askString.c_str()));
+
+                // Log the successful transmission
+                string direction = "Transmitted";
+                string type = "ASK";
+                pair<string, vector<int>> parsedPacket = parsePacket(askString);
+                printPacketMessage(direction, id, 0, type, parsedPacket.second);
+
+
+
                 addReceived = false;
                 counts.ask++;
               }
             }
           } else if (type == "delay") {
-            int trafficId = content[0];
-            if (id == trafficId) {
-            /*
-             * Attribution:
-             * https://stackoverfoward.com/a/19555298
-             * By: https://stackoverfoward.com/users/321937/oz
-             */
-              milliseconds ms = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
-              delayStartTime = ms.count();
-              delayDuration = content[1];
-              printf("Entering a delay period of %i milliseconds.\n", delayDuration);
+                int trafficId = data[0];
+                if (id == trafficId) {
+                    //https://www.geeksforgeeks.org/time-delay-c/
+                    milliseconds ms = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+                    delay = data[1];
+                    printf("Entering a delay period of %i milliseconds.\n", delay);
+                }
+            } else {
+                continue;
             }
-          } else {
-            // Ignore comments, empty lines, or errors.
-          }
         } else {
-          in.close();
+            in.close();
+            }   
         }
-      }
     }
 
     // Poll from all file descriptors
@@ -353,117 +306,126 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
       perror("poll() failure");
       exit(errno);
     }
-
-    /*
-     * 2. Poll the keyboard for a user command. The user can issue one of the following commands.
-     * info: The program writes all entries in the foward table, and for each transmitted or received
-     * packet type, the program writes an aggregate count of handled packets of this type. exit: The
-     * program writes the above information and exits.
-     */
+    // poll for user input
     if (pfds[0].revents & POLLIN) {
-      if (!read(pfds[0].fd, buffer, MAX_BUFFER)) {
-        printf("Error: stdin closed.\n");
-        exit(EXIT_FAILURE);
-      }
+        if (!read(pfds[0].fd, buffer, MAX_BUFFER)) {
+            printf("Error: stdin closed.\n");
+            exit(EXIT_FAILURE);
+        }
 
-      string cmd = string(buffer);
-      trim(cmd);  // trim whitespace
+        string cmd = string(buffer);
+        trim(cmd);  // trim whitespace
 
-      if (cmd == "info") {
-        switchInfo(fowardTable, counts);
-      } else if (cmd == "exit") {
-        switchInfo(fowardTable, counts);
-        exit(EXIT_SUCCESS);
-      } else {
-        printf("Error: Unrecognized command. Please use \"info\" or \"exit\".\n");
-      }
+        if (cmd == "info") {
+            printInfo(fowardTable, counts);
+        } else if (cmd == "exit") {
+            printInfo(fowardTable, counts);
+            exit(EXIT_SUCCESS);
+        } else {
+            printf("Unknown command: <info> or <exit> are valid commands.\n");
+        }
     }
 
     memset(buffer, 0, sizeof(buffer)); // Clear buffer
 
-    /*
-     * 3. Poll the incoming FDs from the master and the attached switches. The switch handles
-     * each incoming packet, as described in the Packet Types section.
-     */
+    // poll for fds
     for (int i = 1; i < PFDS_SIZE; i++) {
-      if (pfds[i].revents & POLLIN) {
-        if (!read(pfds[i].fd, buffer, MAX_BUFFER)) {
-          if (i == socketIndex) {
-            printf("master closed. Exiting.\n");
-            switchInfo(fowardTable, counts);
-            exit(errno);
-          } else {
-            printf("Warning: Connection to sw%i closed.\n", portToId[i]);
-            close(pfds[i].fd);
-            closedPorts.push_back(i);
-            continue;
-          }
-        }
-
-        string packetString = string(buffer);
-        pair<string, vector<int>> receivedPacket = parsePacket(packetString);
-        string packetType = receivedPacket.first;
-        vector<int> msg = receivedPacket.second;
-
-        // Log the successful received packet
-        string direction = "Received";
-        printPacketMessage(direction, portToId[i], id, packetType, msg);
-
-        if (packetType == "HELLO_ACK") {
-          hello_ackReceived = true;
-          counts.hello_ack++;
-        } else if (packetType == "ADD") {
-          addReceived = true;
-
-          fowardRule newRule;
-
-          if (msg[0] == 0) {
-            newRule = {0, MAX_IP, msg[1], msg[2], "DROP", msg[3], 1};
-          } else if (msg[0] == 1) {
-            newRule = {0, MAX_IP, msg[1], msg[2], "FORWARD", msg[3], 1};
-
-            // Open FIFO for writing if not done so already
-            if (!portToFd.count(msg[3])) {
-              string relayFifo = makeFifoName(id, portToId[msg[3]]);
-              int portFd = open(relayFifo.c_str(), O_WRONLY | O_NONBLOCK);
-              pair<int, int> portConnection = make_pair(msg[3], portFd);
-              portToFd.insert(portConnection);
+        if (pfds[i].revents & POLLIN) {
+            if (!read(pfds[i].fd, buffer, MAX_BUFFER)) {
+            if (i == socketIndex) {
+                printf("master closed. Exiting.\n");
+                printInfo(fowardTable, counts);
+                exit(errno);
+            } else {
+                printf("Warning: Connection to sw%i closed.\n", portToId[i]);
+                close(pfds[i].fd);
+                closedPorts.push_back(i);
+                continue;
+            }
             }
 
-            // Ensure switch is not closed before sending
-            if (find(closedPorts.begin(), closedPorts.end(), i) == closedPorts.end()) {
-              sendRelayPacket(portToFd[msg[3]], id, portToId[msg[3]], msg[4], msg[1]);
-            }
+            string packetString = string(buffer);
+            pair<string, vector<int>> receivedPacket = parsePacket(packetString);
+            string packetType = receivedPacket.first;
+            vector<int> msg = receivedPacket.second;
 
-            counts.relayOut++;
-          } else {
-            printf("Error: Invalid rule to add.\n");
-            continue;
-          }
+            // Log the successful received packet
+            string direction = "Received";
+            printPacketMessage(direction, portToId[i], id, packetType, msg);
 
-          fowardTable.push_back(newRule);
-          counts.add++;
-        } else if (packetType == "RELAY") {
-          counts.relayIn++;
+            if (packetType == "HELLO_ACK") {
+                hello_ackReceived = true;
+                counts.hello_ack++;
+            } else if (packetType == "ADD") {
+                addReceived = true;
 
-          // Relay the packet to an adjacent master if the destIp is not meant for this switch
-          if (msg[1] < ipLow || msg[1] > ipHigh) {
-            // Ensure switch is not closed before sending
-            if (find(closedPorts.begin(), closedPorts.end(), i) == closedPorts.end()) {
-              if (id > i) {
-                sendRelayPacket(portToFd[1], id, portToId[1], msg[0], msg[1]);
+                fowardRule newRule;
+
+            if (msg[0] == 0) {
+                newRule = {0, MAX_IP, msg[1], msg[2], "DROP", msg[3], 1};
+            } else if (msg[0] == 1) {
+                newRule = {0, MAX_IP, msg[1], msg[2], "FORWARD", msg[3], 1};
+
+                // Open FIFO for writing if not done so already
+                if (!portToFd.count(msg[3])) {
+                string relayFifo = makeFifoName(id, portToId[msg[3]]);
+                int portFd = open(relayFifo.c_str(), O_WRONLY | O_NONBLOCK);
+                portToFd.insert(make_pair(msg[3], portFd));
+                }
+
+                // Ensure switch is not closed before sending
+                if (find(closedPorts.begin(), closedPorts.end(), i) == closedPorts.end()) {
+                    string relayString = "RELAY:" + to_string(msg[4]) + "," + to_string(msg[1]);
+                    write(portToFd[msg[3]], relayString.c_str(), strlen(relayString.c_str()));
+
+                    // Log the successful transmission
+                    string direction = "Transmitted";
+                    string type = "RELAY";
+                    pair<string, vector<int>> parsedPacket = parsePacket(relayString);
+                    printPacketMessage(direction, msg[4], msg[1], type, parsedPacket.second);
+                }
+
                 counts.relayOut++;
-              } else if (id < i) {
-                sendRelayPacket(portToFd[2], id, portToId[2], msg[0], msg[1]);
-                counts.relayOut++;
-              }
+            } else {
+                printf("Error: Invalid rule to add.\n");
+                continue;
             }
-          }
-        } else {
-          // Unknown packet. Used for debugging.
-          printf("Received %s packet. Ignored.\n", packetType.c_str());
+
+            fowardTable.push_back(newRule);
+            counts.add++;
+            } else if (packetType == "RELAY") {
+            counts.relayIn++;
+
+            // Relay the packet to an adjacent master if the destIp is not meant for this switch
+            if (msg[1] < ipLow || msg[1] > ipHigh) {
+                // Ensure switch is not closed before sending
+                if (find(closedPorts.begin(), closedPorts.end(), i) == closedPorts.end()) {
+                if (id > i) {
+                    string relayString = "RELAY:" + to_string(msg[0]) + "," + to_string(msg[1]);
+                    write(portToFd[1], relayString.c_str(), strlen(relayString.c_str()));
+
+                    // Log the successful transmission
+                    string direction = "Transmitted";
+                    string type = "RELAY";
+                    pair<string, vector<int>> parsedPacket = parsePacket(relayString);
+                    printPacketMessage(direction, msg[0], msg[1], type, parsedPacket.second);
+
+                    counts.relayOut++;
+                } else if (id < i) {
+                    string relayString = "RELAY:" + to_string(msg[0]) + "," + to_string(msg[1]);
+                    write(portToFd[2], relayString.c_str(), strlen(relayString.c_str()));
+
+                    // Log the successful transmission
+                    string direction = "Transmitted";
+                    string type = "RELAY";
+                    pair<string, vector<int>> parsedPacket = parsePacket(relayString);
+                    printPacketMessage(direction, msg[0], msg[1], type, parsedPacket.second);
+                    counts.relayOut++;
+                }
+                }
+            }
+            }
         }
-      }
     }
 
     memset(buffer, 0, sizeof(buffer)); // Clear buffer
