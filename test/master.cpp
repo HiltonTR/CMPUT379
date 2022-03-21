@@ -47,35 +47,6 @@ typedef struct {
     int ipHigh;
 } SwitchInfo;
 
-/**
- * Sends an ACK packet to a connected switch.
- */
-void sendHelloAckPacket(int numSwitches, pollfd pfds[], int fd, int destId) {
-    string helloack = "HELLO_ACK:";
-    write(fd, helloack.c_str(), strlen(helloack.c_str()));
-
-    // Log the successful packet transmission
-    string direction = "Transmitted";
-    string type = "HELLO_ACK";
-    pair<string, vector<int>> parsedPacket = parsePacket(helloack);
-    printPacketMessage(direction, 0, destId, type, parsedPacket.second);
-}
-
-/**
- * Sends an ADD packet to a connected switch.
- */
-void sendAddPacket(int numSwitches, pollfd pfds[], int fd, int destId, int action, int ipLow,
-                    int ipHigh, int relayPort, int srcIp) {
-    string addString = "ADD:" + to_string(action) + "," + to_string(ipLow) + "," + to_string(ipHigh)
-                        + "," + to_string(relayPort) + "," + to_string(srcIp);
-    write(fd, addString.c_str(), strlen(addString.c_str()));
-
-    // Log the successful packet transmission.
-    string direction = "Transmitted";
-    string type = "ADD";
-    pair<string, vector<int>> parsedPacket = parsePacket(addString);
-    printPacketMessage(direction, 0, destId, type, parsedPacket.second);
-}
 
 void printInfo(vector<SwitchInfo> switchInfoTable, MasterPacketCounts &counts) {
     printf("Switch information:\n");
@@ -210,7 +181,15 @@ void MasterLoop(int numSwitches, int portNumber) {
 
                 // Ensure switch is not closed before sending
                 if (find(closedSwitches.begin(), closedSwitches.end(), i) == closedSwitches.end()) {
-                    sendHelloAckPacket(numSwitches, pfds, pfds[i].fd, i);
+                    string helloack = "HELLO_ACK:";
+                    write(pfds[i].fd, helloack.c_str(), strlen(helloack.c_str()));
+
+                    // Log the successful packet transmission
+                    string direction = "Transmitted";
+                    string type = "HELLO_ACK";
+                    pair<string, vector<int>> parsedPacket = parsePacket(helloack);
+                    printPacketMessage(direction, 0, i, type, parsedPacket.second);
+                    
                 }
                 counts.hello_ack++;
                 } else if (packetType == "ASK") {
@@ -220,38 +199,26 @@ void MasterLoop(int numSwitches, int portNumber) {
                 int destIp = packetMessage[1];
 
                 // Check for information in the switch info table
-                bool found = false;
                 for (auto &info : switchInfoTable) {
                     if (destIp >= info.ipLow && destIp <= info.ipHigh) {
-                    found = true;
-
                     int relayPort = 0;
 
-                    // Determine relay port
-                    if (info.id > i) {
-                        relayPort = 2;
-                    } else {
-                        relayPort = 1;
-                    }
-
                     // Ensure switch is not closed before sending
-                    if (find(closedSwitches.begin(), closedSwitches.end(), i) == closedSwitches.end()) {
-                        // Send new rule
-                        sendAddPacket(numSwitches, pfds, idToFd[i], i, 1, info.ipLow, info.ipHigh,
-                                    relayPort, srcIp);
-                    }
+                    string addString = "ADD:" + to_string(1) + "," + to_string(info.ipLow) + "," + to_string(info.ipHigh)
+                                        + "," + to_string(relayPort) + "," + to_string(srcIp);
+                    write(idToFd[i], addString.c_str(), strlen(addString.c_str()));
+
+                    // Log the successful packet transmission.
+                    string direction = "Transmitted";
+                    string type = "ADD";
+                    pair<string, vector<int>> parsedPacket = parsePacket(addString);
+                    printPacketMessage(direction, 0, 1, type, parsedPacket.second);
+
 
                     break;
                     }
                 }
 
-                // If nothing is found drop the switch
-                if (!found) {
-                    // Ensure switch is not closed before sending
-                    if (find(closedSwitches.begin(), closedSwitches.end(), i) == closedSwitches.end()) {
-                    sendAddPacket(numSwitches, pfds, idToFd[i], i, 0, destIp, destIp, 0, srcIp);
-                    }
-                }
 
                 counts.add++;
                 } 

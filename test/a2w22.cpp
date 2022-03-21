@@ -17,49 +17,6 @@
 
 using namespace std;
 
-/**
- * http://www.logix.cz/michal/devel/various/getaddrinfo.c.xp
- */
-string getAddressInfo(string &address) {
-	struct addrinfo hints {}, *res;
-	char ipAddress[100];
-	void *ptr;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags |= AI_CANONNAME;
-
-	int errorCode = getaddrinfo(address.c_str(), nullptr, &hints, &res);
-	if (errorCode != 0) {
-		perror("getaddrinfo() failure");
-		exit(errorCode);
-	}
-
-	printf("Host: %s\n", address.c_str());
-	while (res) {
-		inet_ntop(res->ai_family, res->ai_addr->sa_data, ipAddress, 100);
-
-		switch (res->ai_family) {
-		case AF_INET:
-			ptr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
-			break;
-		case AF_INET6:
-			ptr = &((struct sockaddr_in6 *) res->ai_addr)->sin6_addr;
-			break;
-		default:
-			printf("Error: Invalid IP family. Expected AF_NET or AF_NET6.\n");
-			exit(EXIT_FAILURE);
-		}
-		inet_ntop(res->ai_family, ptr, ipAddress, 100);
-		printf("IPv%d address: %s (%s)\n", res->ai_family == PF_INET6 ? 6 : 4,
-			ipAddress, res->ai_canonname);
-		res = res->ai_next;
-	}
-
-	return ipAddress;
-}
-
 tuple<int, int> getIpRange(string input) {
 	int ipLow = 0;
 	int ipHigh = 0;
@@ -82,7 +39,6 @@ tuple<int, int> getIpRange(string input) {
 
 	return make_tuple(ipLow, ipHigh);
 }
-
 
 
 
@@ -127,7 +83,7 @@ int main(int argc, char **argv) {
 
 		string serverAddress = argv[6];
 		cout << serverAddress << endl;
-		string ipAddress = getAddressInfo(serverAddress);
+		string ipAddress = serverAddress;
 
 		printf("Found IP: %s\n", ipAddress.c_str());
 

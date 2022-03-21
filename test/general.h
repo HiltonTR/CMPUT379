@@ -7,7 +7,7 @@
 
 using namespace std;
 
-string makeFifoName(int senderId, int receiverId);
+string makeFifoName(int a, int b);
 
 pair<string, vector<int>> parsePacket(string &s);
 

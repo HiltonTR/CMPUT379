@@ -30,12 +30,6 @@ vector<int> parsePacketMessage(string &message) {
   return packetContents;
 }
 
-/**
- * Returns FIFO name based on sender and receiver IDs
- */
-string makeFifoName(int senderId, int receiverId) {
-  return "fifo-" + to_string(senderId) + "-" + to_string(receiverId);
-}
 
 /**
  * Parse a packet string. Return the packet type and its message info.
