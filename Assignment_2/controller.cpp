@@ -11,6 +11,14 @@
 
 using namespace std;
 
+struct Session {
+  string inFifo;
+  string outFifo;
+  int inFd;
+  int outFd;
+  int port;
+};
+
 PacketInfo controllerInfo;
 vector<Switch> switches;
 vector<Session> sessions;

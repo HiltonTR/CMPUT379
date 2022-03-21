@@ -14,6 +14,14 @@
 
 using namespace std;
 
+struct Session {
+  string inFifo;
+  string outFifo;
+  int inFd;
+  int outFd;
+  int port;
+};
+
 int switchID;
 // int pswj;
 // int pswk;

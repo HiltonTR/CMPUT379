@@ -39,14 +39,6 @@ struct IPs {
   int high;
 };
 
-struct Session {
-  string inFifo;
-  string outFifo;
-  int inFd;
-  int outFd;
-  int port;
-};
-
 struct Packet {
   PktType type;
   string meesage;
