@@ -20,7 +20,7 @@
 #include "general.h"
 
 #define PFDS_SIZE 5
-#define CONTROLLER_ID 0
+#define MASTER_ID 0
 #define MAX_IP 1000
 #define MAX_BUFFER 1024
 
@@ -41,7 +41,7 @@ typedef struct {
 } SwitchPacketCounts;
 
 /**
- * A struct representing a rule in the flow table
+ * A struct representing a rule in the foward table
  */
 typedef struct {
     int srcIpLow;
@@ -51,14 +51,9 @@ typedef struct {
     string actionType;  // FORWARD, DROP
     int actionVal;
     int pktCount;
-} FlowRule;
+} fowardRule;
 
-/**
- * Determines whether the switch is still delayed
- * Attribution:
- * https://stackoverflow.com/a/19555298
- * By: https://stackoverflow.com/users/321937/oz
- */
+//https://www.geeksforgeeks.org/time-delay-c/
 bool isDelayed(long startTime, int duration) {
   if (duration == 0) {
     return false;
@@ -69,7 +64,7 @@ bool isDelayed(long startTime, int duration) {
 }
 
 /**
- * Sends an OPEN packet to the controller.
+ * Sends an OPEN packet to the master.
  */
 void sendOpenPacket(int fd, int id, int port1Id, int port2Id, int ipLow, int ipHigh) {
   string openString = "HELLO:" + to_string(id) + "," + to_string(port1Id) + "," + to_string(port2Id)
@@ -88,7 +83,7 @@ void sendOpenPacket(int fd, int id, int port1Id, int port2Id, int ipLow, int ipH
 }
 
 /**
- * Send a ASK packet to the controller.
+ * Send a ASK packet to the master.
  */
 void sendAskPacket(int fd, int srcId, int destId, int srcIp, int destIp) {
   string askString = "ASK:" + to_string(srcIp) + "," + to_string(destIp);
@@ -124,105 +119,12 @@ void sendRelayPacket(int fd, int srcId, int destId, int srcIp, int destIp) {
 }
 
 /**
- * Opens a FIFO for reading or writing.
- */
-int openFifo(string &fifo_name, int flag) {
-  // Returns lowest unused file descriptor on success
-  int fd = open(fifo_name.c_str(), flag);
-  if (errno) {
-    perror("Failed to open FIFO");
-    exit(errno);
-  }
-
-  return fd;
-}
-
-/**
- * Creates and opens a FIFO for reading or writing.
- */
-int createFifo(int src, int dest, int flag) {
-  string fifoName = makeFifoName(src, dest);
-
-  mkfifo(fifoName.c_str(), S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-  if (errno) {
-    perror("mkfifo() failure");
-    exit(errno);
-  }
-
-  return openFifo(fifoName, flag);
-}
-
-/**
- * Parses a line in the traffic file.
- * Attribution:
- * https://stackoverflow.com/a/237280
- * By: https://stackoverflow.com/users/30767/zunino
- */
-pair<string, vector<int>> parseTrafficFileLine(string &line) {
-  string type;
-  vector<int> content;
-
-  int id = 0;
-  int srcIp = 0;
-  int destIp = 0;
-
-  istringstream iss(line);
-  vector<string> tokens{istream_iterator<string>{iss}, istream_iterator<string>{}};
-
-  if (line.length() < 1) {
-    type = "empty";
-  } else if (line.substr(0, 1) == "#") {
-    type = "comment";
-  } else {
-    id = -1;
-    if (tokens[0] != string("null")){
-        id = stoi(string(tokens[0]).substr(3,1)); //
-    }
-    content.push_back(id);
-
-    if (tokens[1] == "delay") {
-      type = "delay";
-      int ms = (int) strtol(tokens[2].c_str(), (char **) nullptr, 10);
-      if (ms < 0 || errno) {
-        type = "error";
-        printf("Error: Invalid delay. Skipping line.\n");
-        errno = 0;
-      } else {
-        content.push_back(ms);
-      }
-    } else {
-      type = "action";
-
-      srcIp = (int) strtol(tokens[1].c_str(), (char **) nullptr, 10);
-      if (srcIp < 0 || srcIp > MAX_IP || errno) {
-        type = "error";
-        printf("Error: Invalid IP lower bound.\n");
-        errno = 0;
-      } else {
-        content.push_back(srcIp);
-      }
-
-      destIp = (int) strtol(tokens[2].c_str(), (char **) nullptr, 10);
-      if (destIp < 0 || destIp > MAX_IP || errno) {
-        type = "error";
-        printf("Error: Invalid IP lower bound.\n");
-        errno = 0;
-      } else {
-        content.push_back(destIp);
-      }
-    }
-  }
-
-  return make_pair(type, content);
-}
-
-/**
  * Info the status information of the switch.
  */
-void switchInfo(vector<FlowRule> &flowTable, SwitchPacketCounts &counts) {
-  printf("Flow table:\n");
+void switchInfo(vector<fowardRule> &fowardTable, SwitchPacketCounts &counts) {
+  printf("foward table:\n");
   int i = 0;
-  for (auto &rule : flowTable) {
+  for (auto &rule : fowardTable) {
     printf("[%i] (srcIp= %i-%i, destIp= %i-%i, ", i, rule.srcIpLow,
            rule.srcIpHigh, rule.destIpLow, rule.destIpHigh);
     printf("action= %s:%i, pktCount= %i)\n", rule.actionType.c_str(),
@@ -231,7 +133,7 @@ void switchInfo(vector<FlowRule> &flowTable, SwitchPacketCounts &counts) {
   }
   printf("\n");
   printf("Packet Stats:\n");
-  printf("\tReceived:    ADMIT:%i, HELLO_ACK:%i, ADDRULE:%i, RELAYIN:%i\n", counts.admit, counts.hello_ack,
+  printf("\tReceived:    ADMIT:%i, HELLO_ACK:%i, ADD:%i, RELAYIN:%i\n", counts.admit, counts.hello_ack,
          counts.add, counts.relayIn);
   printf("\tTransmitted: OPEN:%i, ASK:%i, RELAYOUT:%i\n", counts.open, counts.ask,
          counts.relayOut);
@@ -243,8 +145,8 @@ void switchInfo(vector<FlowRule> &flowTable, SwitchPacketCounts &counts) {
  */
 void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstream &in,
                 string &ipAddress, int portNumber) {
-  vector<FlowRule> flowTable; // Flow rule table
-  flowTable.push_back({0, MAX_IP, ipLow, ipHigh, "FORWARD", 3, 0}); // Add initial rule
+  vector<fowardRule> fowardTable; // foward rule table
+  fowardTable.push_back({0, MAX_IP, ipLow, ipHigh, "FORWARD", 3, 0}); // Add initial rule
 
   map<int, int> portToFd; // Map port number to FD
   map<int, int> portToId; // Map port number to switch ID
@@ -252,7 +154,7 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
   // Counts the number of each type of packet seen
   SwitchPacketCounts counts = {0, 0, 0, 0, 0, 0, 0};
 
-  int socketIdx = PFDS_SIZE - 1;
+  int socketIndex = PFDS_SIZE - 1;
 
   char buffer[MAX_BUFFER];
   struct pollfd pfds[PFDS_SIZE];
@@ -265,7 +167,7 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
   struct sockaddr_in server {};
 
   // Creating socket file descriptor
-  if ((pfds[socketIdx].fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+  if ((pfds[socketIndex].fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
     perror("socket() failure");
     exit(errno);
   }
@@ -274,59 +176,57 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
   server.sin_family = AF_INET;
   server.sin_port = htons(portNumber);
 
-  // Convert IPv4 and IPv6 addresses from text to binary form
-  if (inet_pton(AF_INET, ipAddress.c_str(), &server.sin_addr) <= 0) {
-    perror("Invalid IP address");
-    exit(errno);
-  }
-
-  if (connect(pfds[socketIdx].fd, (struct sockaddr *) &server, sizeof(server)) < 0) {
+  if (connect(pfds[socketIndex].fd, (struct sockaddr *) &server, sizeof(server)) < 0) {
     perror("connect() failure");
     exit(errno);
   }
 
-  pair<int, int> controllerToFd = make_pair(0, pfds[socketIdx].fd);
-  portToFd.insert(controllerToFd);
-  pair<int, int> controllerToId = make_pair(0, CONTROLLER_ID);
-  portToId.insert(controllerToId);
+  pair<int, int> masterToFd = make_pair(0, pfds[socketIndex].fd);
+  portToFd.insert(masterToFd);
+  pair<int, int> masterToId = make_pair(0, MASTER_ID);
+  portToId.insert(masterToId);
 
-  // Send an OPEN packet to the controller
-  sendOpenPacket(pfds[socketIdx].fd, id, port1Id, port2Id, ipLow, ipHigh);
+  // Send an OPEN packet to the master
+  sendOpenPacket(pfds[socketIndex].fd, id, port1Id, port2Id, ipLow, ipHigh);
   counts.open++;
 
   // Set socket to non-blocking
-  if (fcntl(pfds[socketIdx].fd, F_SETFL, fcntl(pfds[socketIdx].fd, F_GETFL) | O_NONBLOCK) < 0) {
+  if (fcntl(pfds[socketIndex].fd, F_SETFL, fcntl(pfds[socketIndex].fd, F_GETFL) | O_NONBLOCK) < 0) {
     perror("fnctl() failure");
     exit(errno);
   }
 
-  // Create and open a reading FIFO for port 1 if not null
-  if (port1Id != -1) {
-    pair<int, int> port1Connection = make_pair(1, port1Id);
-    portToId.insert(port1Connection);
-    int port1Fd = createFifo(port1Id, id, O_RDONLY | O_NONBLOCK);
-    pfds[1].fd = port1Fd;
-    pfds[1].events = POLLIN;
-    pfds[1].revents = 0;
-  }
+    if (port1Id != -1) {
+        pair<int, int> port1Connection = make_pair(1, port1Id);
+        portToId.insert(port1Connection);
+        string fifoName = makeFifoName(port1Id, id);
+        mkfifo(fifoName.c_str(), S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+        int port1Fd = open(fifoName.c_str(), O_RDONLY | O_NONBLOCK);
+        pfds[1].fd = port1Fd;
+        pfds[1].events = POLLIN;
+        pfds[1].revents = 0;
+    }
 
-  // Create and open a reading FIFO for port 2 if not null
-  if (port2Id != -1) {
-    pair<int, int> port2Connection = make_pair(2, port2Id);
-    portToId.insert(port2Connection);
-    int port2Fd = createFifo(port2Id, id, O_RDONLY | O_NONBLOCK);
-    pfds[2].fd = port2Fd;
-    pfds[2].events = POLLIN;
-    pfds[2].revents = 0;
-  }
+    // Create and open a reading FIFO for port 2 if not null
+    if (port2Id != -1) {
+        pair<int, int> port2Connection = make_pair(2, port2Id);
+        portToId.insert(port2Connection);
+        string fifoName = makeFifoName(port2Id, id);
+        mkfifo(fifoName.c_str(), S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+        int port2Fd = open(fifoName.c_str(), O_RDONLY | O_NONBLOCK);
+        pfds[2].fd = port2Fd;
+        pfds[2].events = POLLIN;
+        pfds[2].revents = 0;
+    }
 
   // Used to keep track of the delay interval of the switch
   long delayStartTime = 0;
   int delayDuration = 0;
 
-  bool hello_ackReceived = false, addReceived = true; // Used to wait for controller responses.
+  bool hello_ackReceived = false;
+  bool addReceived = true; // Used to wait for master responses.
 
-  vector<int> closed; // Keep track of which ports are closed
+  vector<int> closedPorts; // Keep track of which ports are closed
 
   while (true) {
     /*
@@ -343,10 +243,42 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
       string line;
       if (in.is_open()) {
         if (getline(in, line)) {
-          trafficInfo = parseTrafficFileLine(line);
+            string type;
+            vector<int> content;
 
-          string type = trafficInfo.first;
-          vector<int> content = trafficInfo.second;
+            int id = 0;
+            int srcIp = 0;
+            int destIp = 0;
+
+            istringstream iss(line);
+            vector<string> tokens{istream_iterator<string>{iss}, istream_iterator<string>{}};
+
+            if (line.length() < 1) {
+                continue;
+            } else if (line.substr(0, 1) == "#") {
+                continue;
+            } else {
+                id = -1;
+                if (tokens[0] != string("null")){
+                    id = stoi(string(tokens[0]).substr(3,1)); //
+                }
+                content.push_back(id);
+
+                if (tokens[1] == "delay") {
+                type = "delay";
+                int ms = (int) strtol(tokens[2].c_str(), (char **) nullptr, 10);
+                content.push_back(ms);
+                
+                } else {
+                type = "action";
+
+                srcIp = (int) strtol(tokens[1].c_str(), (char **) nullptr, 10);
+                content.push_back(srcIp);
+
+                destIp = (int) strtol(tokens[2].c_str(), (char **) nullptr, 10);
+                content.push_back(destIp);
+                }
+            }
 
           if (type == "action") {
             int trafficId = content[0];
@@ -356,9 +288,9 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
             if (id == trafficId) {
               counts.admit++;
 
-              // Handle the packet using the flow table
+              // Handle the packet using the foward table
               bool found = false;
-              for (auto &rule : flowTable) {
+              for (auto &rule : fowardTable) {
                 if (destIp >= rule.destIpLow && destIp <= rule.destIpHigh) {
                   found = true;
                   rule.pktCount++;
@@ -369,13 +301,13 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
                       // Open the FIFO for writing if not done already
                       if (!portToFd.count(rule.actionVal)) {
                         string relayFifo = makeFifoName(id, portToId[rule.actionVal]);
-                        int portFd = openFifo(relayFifo, O_WRONLY | O_NONBLOCK);
+                        int portFd = open(relayFifo.c_str(), O_WRONLY | O_NONBLOCK);
                         pair<int, int> portConn = make_pair(rule.actionVal, portFd);
                         portToFd.insert(portConn);
                       }
 
                       // Ensure switch is not closed before sending
-                      if (find(closed.begin(), closed.end(), rule.actionVal) == closed.end()) {
+                      if (find(closedPorts.begin(), closedPorts.end(), rule.actionVal) == closedPorts.end()) {
                         sendRelayPacket(portToFd[rule.actionVal], id, portToId[rule.actionVal],
                                         srcIp, destIp);
                       }
@@ -399,8 +331,8 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
             if (id == trafficId) {
             /*
              * Attribution:
-             * https://stackoverflow.com/a/19555298
-             * By: https://stackoverflow.com/users/321937/oz
+             * https://stackoverfoward.com/a/19555298
+             * By: https://stackoverfoward.com/users/321937/oz
              */
               milliseconds ms = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
               delayStartTime = ms.count();
@@ -424,7 +356,7 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
 
     /*
      * 2. Poll the keyboard for a user command. The user can issue one of the following commands.
-     * info: The program writes all entries in the flow table, and for each transmitted or received
+     * info: The program writes all entries in the foward table, and for each transmitted or received
      * packet type, the program writes an aggregate count of handled packets of this type. exit: The
      * program writes the above information and exits.
      */
@@ -438,9 +370,9 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
       trim(cmd);  // trim whitespace
 
       if (cmd == "info") {
-        switchInfo(flowTable, counts);
+        switchInfo(fowardTable, counts);
       } else if (cmd == "exit") {
-        switchInfo(flowTable, counts);
+        switchInfo(fowardTable, counts);
         exit(EXIT_SUCCESS);
       } else {
         printf("Error: Unrecognized command. Please use \"info\" or \"exit\".\n");
@@ -450,20 +382,20 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
     memset(buffer, 0, sizeof(buffer)); // Clear buffer
 
     /*
-     * 3. Poll the incoming FDs from the controller and the attached switches. The switch handles
+     * 3. Poll the incoming FDs from the master and the attached switches. The switch handles
      * each incoming packet, as described in the Packet Types section.
      */
     for (int i = 1; i < PFDS_SIZE; i++) {
       if (pfds[i].revents & POLLIN) {
         if (!read(pfds[i].fd, buffer, MAX_BUFFER)) {
-          if (i == socketIdx) {
-            printf("Controller closed. Exiting.\n");
-            switchInfo(flowTable, counts);
+          if (i == socketIndex) {
+            printf("master closed. Exiting.\n");
+            switchInfo(fowardTable, counts);
             exit(errno);
           } else {
             printf("Warning: Connection to sw%i closed.\n", portToId[i]);
             close(pfds[i].fd);
-            closed.push_back(i);
+            closedPorts.push_back(i);
             continue;
           }
         }
@@ -483,7 +415,7 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
         } else if (packetType == "ADD") {
           addReceived = true;
 
-          FlowRule newRule;
+          fowardRule newRule;
 
           if (msg[0] == 0) {
             newRule = {0, MAX_IP, msg[1], msg[2], "DROP", msg[3], 1};
@@ -493,13 +425,13 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
             // Open FIFO for writing if not done so already
             if (!portToFd.count(msg[3])) {
               string relayFifo = makeFifoName(id, portToId[msg[3]]);
-              int portFd = openFifo(relayFifo, O_WRONLY | O_NONBLOCK);
+              int portFd = open(relayFifo.c_str(), O_WRONLY | O_NONBLOCK);
               pair<int, int> portConnection = make_pair(msg[3], portFd);
               portToFd.insert(portConnection);
             }
 
             // Ensure switch is not closed before sending
-            if (find(closed.begin(), closed.end(), i) == closed.end()) {
+            if (find(closedPorts.begin(), closedPorts.end(), i) == closedPorts.end()) {
               sendRelayPacket(portToFd[msg[3]], id, portToId[msg[3]], msg[4], msg[1]);
             }
 
@@ -509,15 +441,15 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
             continue;
           }
 
-          flowTable.push_back(newRule);
+          fowardTable.push_back(newRule);
           counts.add++;
         } else if (packetType == "RELAY") {
           counts.relayIn++;
 
-          // Relay the packet to an adjacent controller if the destIp is not meant for this switch
+          // Relay the packet to an adjacent master if the destIp is not meant for this switch
           if (msg[1] < ipLow || msg[1] > ipHigh) {
             // Ensure switch is not closed before sending
-            if (find(closed.begin(), closed.end(), i) == closed.end()) {
+            if (find(closedPorts.begin(), closedPorts.end(), i) == closedPorts.end()) {
               if (id > i) {
                 sendRelayPacket(portToFd[1], id, portToId[1], msg[0], msg[1]);
                 counts.relayOut++;

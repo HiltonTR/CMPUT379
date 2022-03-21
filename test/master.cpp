@@ -74,6 +74,7 @@ void sendAddPacket(int numSwitches, pollfd pfds[], int fd, int destId, int actio
     string direction = "Transmitted";
     string type = "ADD";
     pair<string, vector<int>> parsedPacket = parsePacket(addString);
+    
     printPacketMessage(direction, 0, destId, type, parsedPacket.second);
 }
 
