@@ -3,16 +3,11 @@
 
 #include <string>
 #include <utility>
+#include <iostream>
 #include <vector>
 
 using namespace std;
 
-string makeFifoName(int a, int b);
-
-pair<string, vector<int>> parsePacket(string &s);
-
-void trim(string &s);
-
-void printPacketMessage(string &direction, int srcId, int destId, string &type, vector<int> msg);
+pair<string, vector<int>> readPkt(string &s);
 
 #endif

@@ -1,12 +1,10 @@
-target = submit
-allFiles = Makefile a3sdn.cpp master.cpp master.h switch.cpp switch.h general.cpp general.h report.pdf
-
+#Hilton Truong 1615505 assignment 3
 compile:
-	g++ -std=c++11 -Wall a2w22.cpp master.cpp master.h switch.cpp switch.h general.cpp general.h -o a2w22
+	g++ -std=c++11 -Wall a3w22.cpp master.cpp master.h switch.cpp switch.h general.cpp general.h -o a3w22
 
 tar:
-	tar -cvf $(target).tar $(allFiles)
-	gzip $(target).tar
+	tar -cvf submit.tar makefile a3sdn.cpp master.cpp master.h switch.cpp switch.h general.cpp general.h 379Report3.pdf
+	gzip submit.tar
 
 clean:
 	rm -f *~ out.* *.o

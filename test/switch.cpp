@@ -2,10 +2,6 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <iterator>
@@ -17,6 +13,10 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <algorithm>
 #include "general.h"
 
 #define PFDS_SIZE 5
@@ -129,17 +129,29 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
     pair<int, int> masterToId = make_pair(0, MASTER_ID);
     swid.insert(masterToId);
 
-    // Send an OPEN packet to the master
+    // Send an HELLO packet to the master
 
-    string openString = "HELLO:" + to_string(id) + "," + to_string(port1Id) + "," + to_string(port2Id)
-                        + "," + to_string(ipLow) + "," + to_string(ipHigh);
+    string openString = "HELLO:" + to_string(id) + "," + to_string(port1Id) + "," + to_string(port2Id) + "," + to_string(ipLow) + "," + to_string(ipHigh);
     write(pfds[socketIndex].fd, openString.c_str(), strlen(openString.c_str()));
 
-    // Log the successful transmission
-    string direction = "Transmitted";
-    string type = "HELLO";
-    pair<string, vector<int>> parsedPacket = parsePacket(openString);
-    printPacketMessage(direction, id, 0, type, parsedPacket.second);
+    vector<int> pktMsg = readPkt(openString).second;
+    string port1;
+    if (pktMsg[1] == -1) {
+        port1 = "null";
+    } else {
+        string foo = to_string(pktMsg[1]);
+        port1 = "psw" + foo;
+    }
+
+    string port2;
+    if (pktMsg[2] == -1) {
+        port2 = "null";
+    } else {
+        string foo = to_string(pktMsg[2]);
+        port2 = "psw" + foo;
+    }
+    cout << "Transmitted (src= psw" << id <<", dest= master) [HELLO]:" << endl;
+    cout << "\t (port0= master, port1= "<< port1 <<", port2= "<< port2 <<", port3= "<< pktMsg[3] <<"-"<< pktMsg[4]<< ")" << endl;     
 
 
 
@@ -174,20 +186,14 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
         pfds[2].revents = 0;
     }
 
-  // Used to keep track of the delay interval of the switch
+  // delay for the switch
   int delay = 0;
 
   bool hello_ackReceived = false;
-  bool addReceived = true; // Used to wait for master responses.
+  bool addReceived = true; 
 
-  vector<int> closedPorts; // Keep track of which ports are closed
 
   while (true) {
-    /*
-    * 1. Read and process a single line from the traffic line (if the EOF has not been reached
-    * yet). The switch ignores empty lines, comment lines, and lines specifying other handling
-    * switches. A packet header is considered admitted if the line specifies the current switch.
-    */
     if (hello_ackReceived && addReceived && delay==0) {
       // Reset delay variables
       delay = 0;
@@ -241,7 +247,7 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
             if (id == trafficId) {
               counts.admit++;
 
-              // Handle the packet using the foward table
+              // forwarding table
               bool found = false;
               for (auto &param : fowardTable) {
                 if (destIp >= param.destIpLow && destIp <= param.destIpHigh) {
@@ -258,18 +264,12 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
                         fdid.insert(make_pair(param.actionVal, portFd));
                       }
 
-                      // Ensure switch is not closed before sending
-                      if (find(closedPorts.begin(), closedPorts.end(), param.actionVal) == closedPorts.end()) {
-                        string relayString = "RELAY:" + to_string(srcIp) + "," + to_string(destIp);
-                        write(fdid[param.actionVal], relayString.c_str(), strlen(relayString.c_str()));
 
-                        // Log the successful transmission
-                        string direction = "Transmitted";
-                        string type = "RELAY";
-                        pair<string, vector<int>> parsedPacket = parsePacket(relayString);
-                        printPacketMessage(direction, srcIp, destIp, type, parsedPacket.second);
-                      }
+                    string relayString = "RELAY:" + to_string(srcIp) + "," + to_string(destIp);
+                    write(fdid[param.actionVal], relayString.c_str(), strlen(relayString.c_str()));
 
+                    cout << "Transmitted (src= psw" << srcIp << "dest= psw" << destIp<< ") [RELAY]: header= (srcIP= " << readPkt(relayString).second[0] << ", destIP= "<<
+                    readPkt(relayString).second[1] << ")" << endl;
                       counts.relayOut++;
                     }
                   }
@@ -281,12 +281,8 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
               if (!found) {
                 string askString = "ASK:" + to_string(srcIp) + "," + to_string(destIp);
                 write(fdid[0], askString.c_str(), strlen(askString.c_str()));
-
-                // Log the successful transmission
-                string direction = "Transmitted";
-                string type = "ASK";
-                pair<string, vector<int>> parsedPacket = parsePacket(askString);
-                printPacketMessage(direction, id, 0, type, parsedPacket.second);
+                cout << "Transmitted (src= psw" << id << ", dest= master" << ") [ASK]: header= (srcIP= " << readPkt(askString).second[0] << ", destIP= "<<
+                readPkt(askString).second[1] << ")" << endl;
 
 
 
@@ -324,7 +320,10 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
         }
 
         string cmd = string(buffer);
-        trim(cmd);  // trim whitespace
+        // string trim taken from
+        // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
+        cmd.erase(cmd.begin(), find_if(cmd.begin(), cmd.end(), [](int ch) { return !isspace(ch); }));
+        cmd.erase(find_if(cmd.rbegin(), cmd.rend(), [](int ch) { return !isspace(ch); }).base(), cmd.end());
 
         if (cmd == "info") {
             printInfo(fowardTable, counts);
@@ -349,19 +348,16 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
             } else {
                 printf("Warning: Connection to sw%i closed.\n", swid[i]);
                 close(pfds[i].fd);
-                closedPorts.push_back(i);
                 continue;
             }
             }
 
             string packetString = string(buffer);
-            pair<string, vector<int>> receivedPacket = parsePacket(packetString);
+            pair<string, vector<int>> receivedPacket = readPkt(packetString);
             string packetType = receivedPacket.first;
             vector<int> pkt = receivedPacket.second;
 
-            // Log the successful received packet
-            string direction = "Received";
-            printPacketMessage(direction, swid[i], id, packetType, pkt);
+            cout << "Received (src= master" << ", dest= psw" << swid[i] << ") [HELLO_ACK]" << endl;
 
             if (packetType == "HELLO_ACK") {
                 hello_ackReceived = true;
@@ -376,22 +372,18 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
             } else if (pkt[0] == 1) {
                 newRule = {0, MAX_IP, pkt[1], pkt[2], "FORWARD", pkt[3], 1};
 
-                // Open FIFO for writing if not done so already
+                // open the write fifos
                 if (!fdid.count(pkt[3])) {
                 string relayFifo = makeFifo(id, swid[pkt[3]]);
                 int portFd = open(relayFifo.c_str(), O_WRONLY | O_NONBLOCK);
                 fdid.insert(make_pair(pkt[3], portFd));
                 }
 
-                // Ensure switch is not closed before sending
                 string relayString = "RELAY:" + to_string(pkt[4]) + "," + to_string(pkt[1]);
                 write(fdid[pkt[3]], relayString.c_str(), strlen(relayString.c_str()));
 
-                // Log the successful transmission
-                string direction = "Transmitted";
-                string type = "RELAY";
-                pair<string, vector<int>> parsedPacket = parsePacket(relayString);
-                printPacketMessage(direction, pkt[4], pkt[1], type, parsedPacket.second);
+                cout << "Transmitted (src= psw" << pkt[4] << "dest= psw" << pkt[1] << ") [RELAY]: header= (srcIP= " << readPkt(relayString).second[0] << ", destIP= "<<
+                readPkt(relayString).second[1] << ")" << endl;
             
 
                 counts.relayOut++;
@@ -401,25 +393,6 @@ void switchLoop(int id, int port1Id, int port2Id, int ipLow, int ipHigh, ifstrea
             counts.add++;
             } else if (packetType == "RELAY") {
             counts.relayIn++;
-
-            // Relay the packet to an adjacent master if the destIp is not meant for this switch
-            if (pkt[1] < ipLow || pkt[1] > ipHigh) {
-                // Ensure switch is not closed before sending
-                if (find(closedPorts.begin(), closedPorts.end(), i) == closedPorts.end()) {
-                if (id > i) {
-                    string relayString = "RELAY:" + to_string(pkt[0]) + "," + to_string(pkt[1]);
-                    write(fdid[1], relayString.c_str(), strlen(relayString.c_str()));
-
-                    // Log the successful transmission
-                    string direction = "Transmitted";
-                    string type = "RELAY";
-                    pair<string, vector<int>> parsedPacket = parsePacket(relayString);
-                    printPacketMessage(direction, pkt[0], pkt[1], type, parsedPacket.second);
-
-                    counts.relayOut++;
-                } 
-                }
-            }
             }
         }
     }

@@ -10,50 +10,20 @@
 
 using namespace std;
 
-/**
- * Parses the message portion of a packet
- * Attribution:
- * https://stackoverflow.com/questions/1894886/parsing-a-comma-delimited-stdstring
- * https://stackoverflow.com/a/1894955
- */
-vector<int> parsePacketMessage(string &message) {
-  vector<int> packetContents;
-  stringstream ss(message);
 
-  // Split packet string into ints (comma delimited)
-  int i = 0;
-  while (ss >> i) {
-    packetContents.push_back(i);
-    if (ss.peek() == ',') ss.ignore();
-  }
-
-  return packetContents;
-}
-
-
-/**
- * Parse a packet string. Return the packet type and its message info.
- */
-pair<string, vector<int>> parsePacket(string &s) {
+pair<string, vector<int>> readPkt(string &s) {
   string packetType = s.substr(0, s.find(':'));
-
-  string packetMessageToken = s.substr(s.find(':') + 1);
-  vector<int> packetMessage = parsePacketMessage(packetMessageToken);
-
-  return make_pair(packetType, packetMessage);
-}
-
-
-/**
- * Left and right trim the string (in place)
- * String trimming function found here:
- * https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
- * https://stackoverflow.com/a/217605 
- * By: https://stackoverflow.com/users/13430/evan-teran
- */
-void trim(string &s) {
-  s.erase(s.begin(), find_if(s.begin(), s.end(), [](int ch) { return !isspace(ch); }));
-  s.erase(find_if(s.rbegin(), s.rend(), [](int ch) { return !isspace(ch); }).base(), s.end());
+  vector<int> packetData;
+  stringstream ss(s.substr(s.find(':') + 1));
+  int i = 0;
+  //https://stackoverflow.com/questions/1894886/parsing-a-comma-delimited-stdstring
+  while (ss >> i) {
+    packetData.push_back(i);
+    if (ss.peek() == ','){
+      ss.ignore();
+    }
+  }
+  return make_pair(packetType, packetData);
 }
 
 /**
@@ -106,7 +76,7 @@ void printPacketMessage(string &direction, int srcId, int destId, string &type, 
 
     packetString = ":\n         (srcIp= 0-1000, destIp= " + to_string(msg[1]) + "-" +
                    to_string(msg[2]) + ", action= " + action + ":" + to_string(msg[3]) +
-                   ", pri= 4, pktCount= 0";
+                   ", pktCount= 0";
   } else if (type == "RELAY") {
     packetString = ":  header= (srcIP= " + to_string(msg[0]) +", destIP= " +
                    to_string(msg[1]) + ")";
