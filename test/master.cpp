@@ -3,10 +3,6 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 #include <algorithm>
 #include <map>
@@ -16,6 +12,10 @@
 #include <vector>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <cstring>
 #include <iostream>
 #include "general.h"
@@ -26,9 +26,7 @@
 
 using namespace std;
 
-/**
- * A struct for storing the Master's packet counts
- */
+// struct to hold the values of each packet attribute
 typedef struct {
     int hello;
     int ask;
@@ -36,9 +34,7 @@ typedef struct {
     int hello_ack;
 } MasterPacketCounts;
 
-/**
- * A struct that represents the information of a switch
- */
+// struct to define values of a switch
 typedef struct {
     int id;
     int port1Id;
@@ -47,12 +43,11 @@ typedef struct {
     int ipHigh;
 } SwitchInfo;
 
-
+// prints information of the switch out nicely
 void printInfo(vector<SwitchInfo> switchInfoTable, MasterPacketCounts &counts) {
     printf("Switch information:\n");
     for (auto &info : switchInfoTable) {
-        printf("[psw%i]: port1= %i, port2= %i, port3= %i-%i\n", info.id, info.port1Id, info.port2Id,
-            info.ipLow, info.ipHigh);
+        printf("[psw%i]: port1= %i, port2= %i, port3= %i-%i\n", info.id, info.port1Id, info.port2Id, info.ipLow, info.ipHigh);
     }
     printf("\n");
     printf("Packet stats:\n");
@@ -61,6 +56,7 @@ void printInfo(vector<SwitchInfo> switchInfoTable, MasterPacketCounts &counts) {
 }
 
 void MasterLoop(int numSwitches, int portNumber) {
+    char buffer[MAX_BUFFER];
     // Table containing info about opened switches
     vector<SwitchInfo> switchInfoTable;
 
@@ -68,22 +64,24 @@ void MasterLoop(int numSwitches, int portNumber) {
     map<int, int> idToFd;
 
     // Counts of each type of packet seen
-    MasterPacketCounts counts = {0, 0, 0, 0};
+    MasterPacketCounts counts = {0, //hello
+                                0, //ask
+                                0, //add
+                                0}; //hello ack
 
-    // Set up indices for easy reference
+    // define variables so we dont have to redfine them everytime they're needed
     int pfdsSize = numSwitches + 2;
-    int mainSocket = pfdsSize - 1;
-
     struct pollfd pfds[pfdsSize];
-    char buffer[MAX_BUFFER];
+    int mainSocket = pfdsSize - 1;
+    int sockets[1+numSwitches];
+    int socketIndex = 1;
 
     // Set up STDIN for polling from
     pfds[0].fd = STDIN_FILENO;
     pfds[0].events = POLLIN;
     pfds[0].revents = 0;
 
-    int sockets[1+numSwitches];
-    int socketIndex = 1;
+
     // https://www.gta.ufrj.br/ensino/eel878/sockets/sockaddr_inman.html 
     struct sockaddr_in sin {};
     struct sockaddr_in foo {};
@@ -108,35 +106,40 @@ void MasterLoop(int numSwitches, int portNumber) {
     
     if (bind(pfds[mainSocket].fd, (struct sockaddr *) &sin, sinLength) < 0) {
         perror("bind() failed");
-        for (int i = 0; i < numSwitches + 2; i++) close(pfds[i].fd);
+        for (int i = 0; i < numSwitches + 2; i++) {
+            close(pfds[i].fd);
+        }
         exit(errno);
     }
 
     // max connection requests
     if (listen(pfds[mainSocket].fd, numSwitches) < 0) {
         perror("listen() failed");
-        for (int i = 0; i < numSwitches + 2; i++) close(pfds[i].fd);
+        for (int i = 0; i < numSwitches + 2; i++) {
+            close(pfds[i].fd);
+        }
         exit(errno);
     }
 
-    vector<int> closedSwitches;
 
     while (true) {
         // poll the user for inputs and lists them out to the forwarding table
-        if (poll(pfds, (nfds_t) pfdsSize, 0) == -1) { // Poll from all file descriptors
+        if (poll(pfds, (nfds_t) pfdsSize, 0) == -1) { 
             perror("poll() failed");
             for (int i = 0; i < numSwitches + 2; i++) close(pfds[i].fd);
             exit(errno);
         }
         if (pfds[0].revents & POLLIN) {
-
             if (!read(pfds[0].fd, buffer, MAX_BUFFER)) {
                 printf("Stdin is closed.\n");
                 exit(EXIT_FAILURE);
             }
 
             string cmd = string(buffer);
-            trim(cmd); // Trim whitespace
+            // string trim taken from
+            // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
+            cmd.erase(cmd.begin(), find_if(cmd.begin(), cmd.end(), [](int ch) { return !isspace(ch); }));
+            cmd.erase(find_if(cmd.rbegin(), cmd.rend(), [](int ch) { return !isspace(ch); }).base(), cmd.end());
             
             if (cmd == "info") {
                 printInfo(switchInfoTable, counts);
@@ -158,61 +161,60 @@ void MasterLoop(int numSwitches, int portNumber) {
                 if (!read(pfds[i].fd, buffer, MAX_BUFFER)) {
                 printf("Lost connection to sw%d.\n", i);
                 close(pfds[i].fd);
-                closedSwitches.push_back(i);
                 //continue;
                 }
 
                 string packet = string(buffer);
-                pair<string, vector<int>> receivedPacket = parsePacket(packet);
-                string packetType = get<0>(receivedPacket);
-                vector<int> packetMessage = get<1>(receivedPacket);
+                string pktType = readPkt(packet).first;
+                vector<int> pktMsg = readPkt(packet).second;
 
-                // Log the successful received packet
-                string direction = "Received";
-                printPacketMessage(direction, i, MASTER_ID, packetType, packetMessage);
+                string port1;
+                if (pktMsg[1] == -1) {
+                    port1 = "null";
+                } else {
+                    string foo = to_string(pktMsg[1]);
+                    port1 = "psw" + foo;
+                }
 
-                // open -> hello
-                if (packetType == "HELLO") {
+                string port2;
+                if (pktMsg[2] == -1) {
+                    port2 = "null";
+                } else {
+                    string foo = to_string(pktMsg[2]);
+                    port2 = "psw" + foo;
+                }
+
+                cout << "Received (src= psw" << i << ", dest= master) [HELLO]:" << endl;
+                cout << "\t (port0= master, port1= "<< port1 <<", port2= "<< port2 <<", port3= "<< pktMsg[3] <<"-"<< pktMsg[4]<< ")" << endl;          
+
+                if (pktType == "HELLO") {
                 counts.hello++;
-                switchInfoTable.push_back({packetMessage[0], packetMessage[1], packetMessage[2],
-                                            packetMessage[3], packetMessage[4]});
-
+                switchInfoTable.push_back({pktMsg[0], pktMsg[1], pktMsg[2], pktMsg[3], pktMsg[4]});
                 idToFd.insert({i, pfds[i].fd});
 
-                // Ensure switch is not closed before sending
-                if (find(closedSwitches.begin(), closedSwitches.end(), i) == closedSwitches.end()) {
-                    string helloack = "HELLO_ACK:";
-                    write(pfds[i].fd, helloack.c_str(), strlen(helloack.c_str()));
-
-                    // Log the successful packet transmission
-                    string direction = "Transmitted";
-                    string type = "HELLO_ACK";
-                    pair<string, vector<int>> parsedPacket = parsePacket(helloack);
-                    printPacketMessage(direction, 0, i, type, parsedPacket.second);
-                    
-                }
+                string helloack = "HELLO_ACK:";
+                write(pfds[i].fd, helloack.c_str(), strlen(helloack.c_str()));
+                cout << "Transmitted (src= master" << ", dest= psw" << i << ") [HELLO_ACK]" << endl;
+                
                 counts.hello_ack++;
-                } else if (packetType == "ASK") {
+                } else if (pktType == "ASK") {
                 counts.ask++;
 
-                int srcIp = packetMessage[0];
-                int destIp = packetMessage[1];
+                int srcIp = pktMsg[0];
+                int destIp = pktMsg[1];
 
                 // Check for information in the switch info table
                 for (auto &info : switchInfoTable) {
                     if (destIp >= info.ipLow && destIp <= info.ipHigh) {
                     int relayPort = 0;
 
-                    // Ensure switch is not closed before sending
-                    string addString = "ADD:" + to_string(1) + "," + to_string(info.ipLow) + "," + to_string(info.ipHigh)
-                                        + "," + to_string(relayPort) + "," + to_string(srcIp);
+
+                    string addString = "ADD:" + to_string(1) + "," + to_string(info.ipLow) + "," + to_string(info.ipHigh) + "," + to_string(relayPort) + "," + to_string(srcIp);
                     write(idToFd[i], addString.c_str(), strlen(addString.c_str()));
 
-                    // Log the successful packet transmission.
-                    string direction = "Transmitted";
-                    string type = "ADD";
-                    pair<string, vector<int>> parsedPacket = parsePacket(addString);
-                    printPacketMessage(direction, 0, 1, type, parsedPacket.second);
+                    cout << "Transmitted (src= psw" << 0 << ", dest= psw" << 1 << ") [ADD]:" << endl;
+                    cout <<"\t (srcIp= 0-1000, destIp= " << readPkt(addString).second[1] << "-" << readPkt(addString).second[2] << "," << ", action= " << 
+                            readPkt(addString).second[3] << ", pktCount= 0" << endl;
 
 
                     break;
@@ -228,7 +230,7 @@ void MasterLoop(int numSwitches, int portNumber) {
         memset(buffer, 0, sizeof(buffer)); // Clear buffer
 
         
-        // 
+        // poll socket for info
         if (pfds[mainSocket].revents & POLLIN) {
             if ((sockets[socketIndex] = accept(pfds[mainSocket].fd, (struct sockaddr *) &foo, &fooSize)) < 0) {
                 perror("accept() failed");
