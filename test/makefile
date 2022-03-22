@@ -1,5 +1,5 @@
 #Hilton Truong 1615505 assignment 3
-compile:
+a3w22:
 	g++ -std=c++11 -Wall a3w22.cpp master.cpp master.h switch.cpp switch.h general.cpp general.h -o a3w22
 
 tar:
@@ -7,4 +7,4 @@ tar:
 	gzip submit.tar
 
 clean:
-	rm -f *~ out.* *.o
+	rm -f *~ out.* *.o 
