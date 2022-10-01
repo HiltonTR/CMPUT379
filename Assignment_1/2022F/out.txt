@@ -1,0 +1,20 @@
+THE INPUT FILE IS: out.txt
+size: 1
+Hello! This is Test.cpp!
+Input your values!
+Your inputs: 1 2 3 4 5
+Now we'll use your command line arguments!
+Your command line arguments: 
+BING CHILLING! NOW YOU WILL WAIT FOR YOUR NUMBER!
+
+Your total sum is: 15. Thanks for using Test.cpp! 
+THE INPUT FILE IS: out.txt
+size: 1
+Hello! This is Test.cpp!
+Input your values!
+Your inputs: 1 2 3 4 5
+Now we'll use your command line arguments!
+Your command line arguments: 
+BING CHILLING! NOW YOU WILL WAIT FOR YOUR NUMBER!
+
+Your total sum is: 15. Thanks for using Test.cpp! 

@@ -2,20 +2,25 @@
 # CCID: truong
 # ID: 1615505
 
-target = submit
-files = msh379.cpp Makefile 379_Assignment_1_Report.pdf
 
-all: msh 379
+all: link
 
-msh 379: msh379.o
-	g++ -o msh379 msh379.o
+link: Shell.o Process.o Commands.o 
+	g++ -o shell379 Shell.o Process.o Commands.o 
 
-msh379.o: msh379.cpp
-	g++ -c msh379.cpp
+compile: Shell.o Process.o Commands.o 
+
+Shell.o: Shell.cpp 
+	g++ -c Shell.cpp
+
+Process.o: Process.cpp Process.h
+	g++ -c Process.cpp
+
+Commands.o: Commands.cpp Commands.h
+	g++ -c Commands.cpp
+
+compress:
+	zip shell379.zip Makefile -r .cpp.h
 
 clean:
-	rm -f msh379.o msh379
-
-tar: 
-	tar -cvf$(target).tar $(files)
-	gzip $(target).tar
+	rm -f *.o shell379

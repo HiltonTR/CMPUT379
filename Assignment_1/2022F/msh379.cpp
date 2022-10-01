@@ -30,7 +30,6 @@
 #include <sys/wait.h>
 #include <map>
 
-#include <assert.h> // assert
 using namespace std;
 
 // ------------------------------
@@ -159,12 +158,13 @@ void run(vector<string> &tokens) {
         }
     }
 
+/*
     cout << "cmdList: "<<endl;
     for(auto i: cmdList) {
         cout << i << endl;
     }
     cout << endl;
-
+*/
 
     // ^^^^^^^
 
@@ -174,7 +174,7 @@ void run(vector<string> &tokens) {
 
     if (tokens.size() > 1) {
         cout << "last char" << tokens.back() << endl;
-        if (tokens.back() == "&") {https://stackoverflow.com/questions/10150468/how-to-redirect-cin-and-cout-to-files
+        if (tokens.back() == "&") { 
             runInBackground = true;
         } else {
             runInBackground = false;
