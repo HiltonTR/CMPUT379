@@ -52,9 +52,9 @@ map<pid_t, task> processes = map<pid_t, task>();
 void printCPUTime() {
     struct rusage r;
 
-    getrusage(RUSAGE_SELF, &r);
+    getrusage(RUSAGE_CHILDREN, &r);
 
-    printf("CPU time: %lu s\nSys time: %lu s\n", r.ru_utime.tv_sec, r.ru_stime.tv_sec);
+    printf("CPU time: %ld s\nSys time: %ld s\n", r.ru_utime.tv_sec, r.ru_stime.tv_sec);
 
     return;
 }
@@ -82,7 +82,7 @@ void listJobs() {
 
         for (auto &item : processes) {
             task currentTask = item.second;
-            cout << "current : "<< currentTask.cmd << endl;
+            // cout << "current : "<< currentTask.cmd << endl;
 
             int runTime = getRunTime(currentTask.pid);
             printf(
@@ -150,7 +150,8 @@ void run(vector<string> &tokens) {
                 outputFile = item.erase(0,1);
                 cout << "output: " << outputFile << endl;
             } else if (item[0] == '<') {
-                cmdList.push_back(inputFile.substr());
+                //cmdList.push_back(inputFile.substr());
+                inputFile = item.erase(0,1);
                 cout << "input: " << inputFile << endl;
             } else if (!(item.substr() == "&")){
                 cmdList.push_back(item.substr());
@@ -173,7 +174,7 @@ void run(vector<string> &tokens) {
 
     if (tokens.size() > 1) {
         cout << "last char" << tokens.back() << endl;
-        if (tokens.back() == "&") {
+        if (tokens.back() == "&") {https://stackoverflow.com/questions/10150468/how-to-redirect-cin-and-cout-to-files
             runInBackground = true;
         } else {
             runInBackground = false;
@@ -190,10 +191,27 @@ void run(vector<string> &tokens) {
         return;
     }
 
+
     int errorFlag = 0;
     if (pid == 0) { // child process
         printf("child process here\n");
-        cout << "size" << cmdList.size() << endl;
+
+        // Check if redirect to output file
+        // https://stackoverflow.com/questions/18086193/redirect-stdout-stderr-to-file-under-unix-c-again 
+        if (outputFile != "") {
+            cout << "THE OUTPUT FILE IS: " << outputFile << endl;
+
+            int outFile = open(outputFile.c_str() , O_CREAT | O_WRONLY | O_APPEND, S_IRWXU);
+            dup2(outFile, STDOUT_FILENO);
+            close(outFile);
+        }
+        if (inputFile != "") {
+            cout << "THE INPUT FILE IS: " << outputFile << endl;
+            int inFile = open(inputFile.c_str() , O_RDONLY, S_IRWXU);
+            dup2(inFile, STDIN_FILENO);
+            close(inFile);
+        }
+        cout << "size: " << cmdList.size() << endl;
         switch (cmdList.size()) {
             case 1:
                 errorFlag = execlp(cmdList.at(0).c_str(), cmdList.at(0).c_str(), 
@@ -241,13 +259,7 @@ void run(vector<string> &tokens) {
             cerr << "Could not execute " << cmdList.at(0) << endl;
             exit(1);
         }
-               
-
-        // Check if redirect to output file
-        cout << outputFile << endl;
-        if (outputFile != "") {
-            freopen(outputFile.c_str(), "w", stdout);
-        }
+        
 
     } else { // parent process
         printf("parent process here\n");
@@ -264,7 +276,7 @@ void run(vector<string> &tokens) {
         processes.emplace(pid, newTask);
 
         // if it is not running in the background wait for it then delete it after it's done running
-        if (runInBackground == true) {
+        if (runInBackground == false) {
             // https://stackoverflow.com/questions/21248840/example-of-waitpid-in-use
             int status;
             waitpid(pid, &status, 0);
