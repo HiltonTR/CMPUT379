@@ -10,7 +10,7 @@ link: Shell.o Process.o Commands.o
 
 compile: Shell.o Process.o Commands.o 
 
-Shell.o: Shell.cpp 
+Shell.o: Shell.cpp Shell.h
 	g++ -c Shell.cpp
 
 Process.o: Process.cpp Process.h

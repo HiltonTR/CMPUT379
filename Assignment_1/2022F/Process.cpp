@@ -34,24 +34,13 @@ void run(vector<string> &tokens) {
         for (string item : tokens) {
             if(item[0] == '>') {
                 outputFile = item.erase(0,1);
-                cout << "output: " << outputFile << endl;
             } else if (item[0] == '<') {
-                //cmdList.push_back(inputFile.substr());
                 inputFile = item.erase(0,1);
-                cout << "input: " << inputFile << endl;
             } else if (!(item.substr() == "&")){
                 cmdList.push_back(item.substr());
             }
         }
     }
-
-    cout << "cmdList: "<<endl;
-    for(auto i: cmdList) {
-        cout << i << endl;
-    }
-    cout << endl;
-
-
     // ^^^^^^^
 
     // check if it is running in the background vvvvvvv
@@ -59,7 +48,6 @@ void run(vector<string> &tokens) {
     bool runInBackground = false;
 
     if (tokens.size() > 1) {
-        cout << "last char" << tokens.back() << endl;
         if (tokens.back() == "&") { 
             runInBackground = true;
         } else {
@@ -67,7 +55,6 @@ void run(vector<string> &tokens) {
         }
     }
 
-    cout << "T/F: " << runInBackground << endl;
 
     // ^^^^^^^
 
@@ -80,24 +67,20 @@ void run(vector<string> &tokens) {
 
     int errorFlag = 0;
     if (pid == 0) { // child process
-        printf("child process here\n");
-
         // Check if redirect to output file
         // https://stackoverflow.com/questions/18086193/redirect-stdout-stderr-to-file-under-unix-c-again 
         if (outputFile != "") {
-            cout << "THE OUTPUT FILE IS: " << outputFile << endl;
 
             int outFile = open(outputFile.c_str() , O_CREAT | O_WRONLY | O_APPEND, S_IRWXU);
             dup2(outFile, STDOUT_FILENO);
             close(outFile);
         }
         if (inputFile != "") {
-            cout << "THE INPUT FILE IS: " << outputFile << endl;
             int inFile = open(inputFile.c_str() , O_RDONLY, S_IRWXU);
             dup2(inFile, STDIN_FILENO);
             close(inFile);
         }
-        cout << "size: " << cmdList.size() << endl;
+        //cout << "size: " << cmdList.size() << endl;
         switch (cmdList.size()) {
             case 1:
                 errorFlag = execlp(cmdList.at(0).c_str(), cmdList.at(0).c_str(), 
@@ -139,22 +122,18 @@ void run(vector<string> &tokens) {
                 break;
         }
 
-        cout << errorFlag << endl;
-        cout << "executed" << endl;
         if (errorFlag == -1) {
-            cerr << "Could not execute " << cmdList.at(0) << endl;
+            cout << "Could not execute " << cmdList.at(0) << endl;
             exit(1);
         }
         
 
     } else { // parent process
-        printf("parent process here\n");
         string cmdStr;
         int length = tokens.size();
         for (int i=0; i < length; i++) {
             cmdStr.append(" " + tokens.at(i));
         }
-        cout << "commandStr: " << cmdStr << endl;
         task newTask;
         newTask.pid = pid;
         newTask.cmd = cmdStr;
