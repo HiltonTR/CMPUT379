@@ -4,7 +4,9 @@
 // that will read the input and check it.
 int main(int argc, char *argv[]) {
 
-    for (string cmd; cout << "Shell379: ";){
+    for (;;){
+        string cmd; 
+        cout << "Shell379: ";
         // get the input line
         getline(cin, cmd);
         if (cmd.empty()){
