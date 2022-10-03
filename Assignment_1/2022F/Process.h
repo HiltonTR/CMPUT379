@@ -20,7 +20,8 @@
 
 
 using namespace std;
-
+// here we create a struct to have all the information about the process that we need
+// we can then put it as the value in the map and have the key the pid as that's what we search by
 struct task {
     pid_t pid;
     string cmd;
