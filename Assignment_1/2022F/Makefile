@@ -19,7 +19,7 @@ Commands.o: Commands.cpp Commands.h
 	g++ -c Commands.cpp
 
 zip:
-	zip shell379.zip Makefile -r *.cpp *.h
+	zip shell379.zip Makefile -r *.cpp *.h README.txt
 
 clean:
 	rm -f *.o shell379
