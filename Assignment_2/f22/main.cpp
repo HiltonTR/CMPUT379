@@ -34,15 +34,24 @@ string output;
 auto start_time = chrono::high_resolution_clock::now();
 
 // define id
-int thread_count = 1;
+int consumeThreads = 1;
 int consumerID[1];
+bool in_progress = false;
+
+void test() {
+    string command;
+    while (getline(cin, command)) {
+        cout << command[0] << " " << command[1] << endl;
+    }
+}
 
 
 void* producer(void* args) {
     string command;
+    in_progress = true;
     while (getline(cin, command)) {
-        cout << command[0] << " " << command[1] << endl;
-
+        //cout << command[0] << " " << command[1] << endl;
+        int n = (int)command[1] - 48;
         while ((int)buffer.size() >= maxbuffer) {
             pthread_cond_wait(&buffer_control.decrement, &buffer_control.mutex);
         }
@@ -54,10 +63,12 @@ void* producer(void* args) {
             
             // log information here
             char task[128];
-            sprintf (task, "%.3f ID= %2d Q= %2ld %-10s %d\n",
+
+            sprintf (task, "%.3f ID= %2d Q=%2ld %-10s %i\n",
                 (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
-                0, buffer.size(), "Work", command[1]);
+                0, buffer.size(), "Work", n);
             output.append(task);
+            cout << task;
 
             // push to queue
             buffer.push(command);
@@ -70,85 +81,89 @@ void* producer(void* args) {
 
 
         } else if (command[0] == 'S') {
-            // lock the buffer
-            pthread_mutex_lock(&buffer_control.mutex);
-
             // log information here
             char task[128];
-            sprintf (task, "%.3f ID= %2d Q= %2ld %-10s %d\n",
+            sprintf (task, "%.3f ID= %2d Q=%2ld %-10s %i\n",
                 (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
-                0, buffer.size(), "Sleep", command[1]);
+                0, buffer.size(), "Sleep", n);
             output.append(task);
+            cout << task;
 
             // sleep
-                Sleep(command[1]);
-
-            // free buffer
-            pthread_mutex_unlock(&buffer_control.mutex);
-
+            Sleep(command[1]);
         }
 
 
     }
+    in_progress = false;
     // print output
 
 
     return 0;
 }
 
-// Consumer Section
+//Consumer Section
 void* consume(void* args) {
-    // Log asked
-    char ask[128];
-    sprintf (ask, "%.3f ID= %2d      %-10s\n",
-        (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
-        0, "Ask");
-    output.append(ask);
+    int id = consumeThreads;
+    int jobs_complete = 0;  
+    consumeThreads++;
+    while(in_progress) {
+        // Log asked
+        char ask[128];
+        sprintf (ask, "%.3f ID= %2d      %-10s\n",
+            (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
+            id, "Ask");
+        output.append(ask);
+        cout << ask;
 
-    // Lock buffer
-    pthread_mutex_lock(&buffer_control.mutex);
+        // Lock buffer
+        pthread_mutex_lock(&buffer_control.mutex);
 
-    // Wait for work
-    while (buffer.empty()) {
-        // Wait until signal that buffer is not empty
-        pthread_cond_wait(&buffer_control.increment, &buffer_control.mutex);
+        // Wait for work
+        while (buffer.empty()) {
+            // Wait until signal that buffer is not empty
+            pthread_cond_wait(&buffer_control.increment, &buffer_control.mutex);
+        }
+
+        // Pop from queue
+        string command = buffer.front();
+        buffer.pop();
+        int n = (int)command[1] - 48;
+
+        // Signal to producer that something was removed from the buffer
+        pthread_cond_signal(&buffer_control.decrement);
+
+        // Unlock buffer
+        pthread_mutex_unlock(&buffer_control.mutex);
+
+        // Log received
+        char receive[128];
+        sprintf (receive, "%.3f ID= %2d      %-10s %i\n",
+            (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
+            id, "Receive", n);
+        output.append(receive);
+        cout << receive;
+
+        // Perform the work
+        Trans(command[1]);
+
+        // Log complete
+        char complete[128];
+        sprintf (complete, "%.3f ID= %2d      %-10s %i\n",
+            (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
+            id, "Complete", n);
+        output.append(complete);
+        cout << complete;
+
+        // increment completed task counter 
     }
-
-    // Pop from queue
-    string command = buffer.front();
-    buffer.pop();
-
-    // Signal to producer that something was removed from the buffer
-    pthread_cond_signal(&buffer_control.decrement);
-
-    // Unlock buffer
-    pthread_mutex_unlock(&buffer_control.mutex);
-
-    // Log received
-    char receive[128];
-    sprintf (receive, "%.3f ID= %2d      %-10s %d\n",
-        (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
-        0, "Receive", command[1]);
-    output.append(receive);
-
-    // Perform the work
-    Trans(command[1]);
-
-    // Log complete
-    char complete[128];
-    sprintf (complete, "%.3f ID= %2d      %-10s %d\n",
-        (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
-        0, "Complete", command[1]);
-    output.append(complete);
-
-    // increment completed task counter 
-
     return 0;
 }
 
 int main(int argc, char* argv[]) {
+    start_time = chrono::high_resolution_clock::now();
     // defines the default amount of threads
-    int nthreads = 0;
+    int nthreads;
     int thread_id = 0;
     char output_file[64];
 
@@ -176,12 +191,16 @@ int main(int argc, char* argv[]) {
 
     pthread_t threads[nthreads];
 
-    // spawn producer here
+
+    //spawn producer here
     pthread_create(&threads[0], NULL, producer, 0);
-    // spawn consumer here
+    //spawn consumer here
     for (int i = 0; i < nthreads; ++i) {
-        consumerID[i] = i + 1;
-        pthread_create(&threads[i], NULL, consume, &consumerID[i]);
+        pthread_create(&threads[i], NULL, consume, 0);
+    }
+
+    for (int i = 0; i < nthreads; i++) {
+        pthread_join(threads[i], NULL);
     }
     
     return 0;
