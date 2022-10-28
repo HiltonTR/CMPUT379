@@ -38,14 +38,6 @@ int consumeThreads = 1;
 int consumerID[1];
 bool in_progress = false;
 
-void test() {
-    string command;
-    while (getline(cin, command)) {
-        cout << command[0] << " " << command[1] << endl;
-    }
-}
-
-
 void* producer(void* args) {
     string command;
     in_progress = true;
@@ -156,6 +148,7 @@ void* consume(void* args) {
         cout << complete;
 
         // increment completed task counter 
+        jobs_complete++;
     }
     return 0;
 }
