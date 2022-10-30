@@ -45,12 +45,15 @@ int ask_count = 0;
 int receive_count = 0;
 int complete_count = 0;
 int sleep_count = 0;
-vector<int> no_of_completed_tasks;
+map<int, int> thread_completed_tasks;
+
 // define id
+int nthreads;
 int consumeThreads = 1;
 int consumerID[1];
 bool in_progress = false;
 
+bool done = false;
 
 void* producer(void* args) {
     string command;
@@ -58,15 +61,9 @@ void* producer(void* args) {
     while (getline(cin, command)) {
         //cout << command[0] << " " << command[1] << endl;
         int n = (int)command[1] - 48;
-        while ((int)buffer.size() >= maxbuffer) {
-            pthread_cond_wait(&buffer_control.decrement, &buffer_control.mutex);
-        }
 
         // check if it doesn't exceed max buffer, if it does wait
         if (command[0] == 'T'){
-            // lock the buffer
-            pthread_mutex_lock(&buffer_control.mutex);
-            
             // log information here
             char task[128];
             sprintf (task, "\t%.3f ID= %2d Q=%2ld %-10s %i\n",
@@ -77,6 +74,13 @@ void* producer(void* args) {
 
             // increase work count
             work_count++;
+
+            // lock the buffer
+            pthread_mutex_lock(&buffer_control.mutex);
+
+            while ((int)buffer.size() >= maxbuffer) {
+                pthread_cond_wait(&buffer_control.decrement, &buffer_control.mutex);
+            }            
 
             // push to queue
             buffer.push(command);
@@ -106,6 +110,10 @@ void* producer(void* args) {
 
 
     }
+    done = true;
+    pthread_mutex_lock(&buffer_control.mutex);
+    pthread_cond_broadcast(&buffer_control.increment);
+    pthread_mutex_unlock(&buffer_control.mutex);
     in_progress = false;
     return 0;
 }
@@ -113,7 +121,7 @@ void* producer(void* args) {
 //Consumer Section
 void* consume(void* args) {
     int id = consumeThreads;
-    int jobs_complete = 0;  
+    int jobs_complete = 0;
     consumeThreads++;
     while(in_progress) {
         // Log asked
@@ -132,6 +140,10 @@ void* consume(void* args) {
 
         // Wait for work
         while (buffer.empty()) {
+            if (done) {
+                pthread_mutex_unlock(&buffer_control.mutex);
+                return 0;
+            }
             // Wait until signal that buffer is not empty
             pthread_cond_wait(&buffer_control.increment, &buffer_control.mutex);
         }
@@ -174,15 +186,15 @@ void* consume(void* args) {
 
         // increment completed task counter 
         jobs_complete++;
+        cout << id << "\t" << jobs_complete << "\t" << thread_completed_tasks.size() << endl;
+        thread_completed_tasks[id] = jobs_complete;
     }
-    no_of_completed_tasks.push_back(jobs_complete);
     return 0;
 }
 
 int main(int argc, char* argv[]) {
     start_time = get_time();
     // defines the default amount of threads
-    int nthreads;
     int thread_id = 0;
     char output_file[64];
 
@@ -222,7 +234,7 @@ int main(int argc, char* argv[]) {
         pthread_join(threads[i], NULL);
     }
 
-    output_stats(no_of_completed_tasks, work_count, ask_count, receive_count, complete_count, sleep_count, get_time_difference(start_time));
+    output_stats(nthreads, thread_completed_tasks, work_count, ask_count, receive_count, complete_count, sleep_count, get_time_difference(start_time));
 
     return 0;
 }
