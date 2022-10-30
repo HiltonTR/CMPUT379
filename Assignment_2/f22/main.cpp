@@ -5,8 +5,14 @@
 #include <thread>
 #include <queue>
 #include <mutex>
-#include "tands.c"
 #include <vector>
+#include <stdio.h>
+#include <cstdio>
+#include <fstream>
+
+#include "tands.c"
+#include "general.h"
+#include "outfile.h"
 
 using namespace std;
 
@@ -31,12 +37,20 @@ pthread_buffer buffer_control;
 string output;
 
 // defines start time
-auto start_time = chrono::high_resolution_clock::now();
+chrono::time_point<std::chrono::high_resolution_clock> start_time;
+
+// defines count for summary
+int work_count = 0;
+int ask_count = 0;
+int receive_count = 0;
+int complete_count = 0;
+int sleep_count = 0;
 
 // define id
 int consumeThreads = 1;
 int consumerID[1];
 bool in_progress = false;
+
 
 void* producer(void* args) {
     string command;
@@ -55,12 +69,14 @@ void* producer(void* args) {
             
             // log information here
             char task[128];
-
             sprintf (task, "%.3f ID= %2d Q=%2ld %-10s %i\n",
-                (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
+                get_time_difference(start_time), 
                 0, buffer.size(), "Work", n);
             output.append(task);
             cout << task;
+
+            // increase work count
+            work_count++;
 
             // push to queue
             buffer.push(command);
@@ -76,13 +92,16 @@ void* producer(void* args) {
             // log information here
             char task[128];
             sprintf (task, "%.3f ID= %2d Q=%2ld %-10s %i\n",
-                (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
+                get_time_difference(start_time), 
                 0, buffer.size(), "Sleep", n);
             output.append(task);
             cout << task;
 
             // sleep
             Sleep(command[1]);
+
+            // increase sleep count
+            sleep_count++;
         }
 
 
@@ -103,10 +122,13 @@ void* consume(void* args) {
         // Log asked
         char ask[128];
         sprintf (ask, "%.3f ID= %2d      %-10s\n",
-            (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
+            get_time_difference(start_time), 
             id, "Ask");
         output.append(ask);
         cout << ask;
+
+        // increase ask count
+        ask_count++;
 
         // Lock buffer
         pthread_mutex_lock(&buffer_control.mutex);
@@ -131,10 +153,13 @@ void* consume(void* args) {
         // Log received
         char receive[128];
         sprintf (receive, "%.3f ID= %2d      %-10s %i\n",
-            (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
+            get_time_difference(start_time), 
             id, "Receive", n);
         output.append(receive);
         cout << receive;
+
+        // increase receive count
+        receive_count++;
 
         // Perform the work
         Trans(command[1]);
@@ -142,10 +167,13 @@ void* consume(void* args) {
         // Log complete
         char complete[128];
         sprintf (complete, "%.3f ID= %2d      %-10s %i\n",
-            (double)chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start_time).count()/(double)1000000, 
+            get_time_difference(start_time), 
             id, "Complete", n);
         output.append(complete);
         cout << complete;
+
+        // increase complete count
+        complete_count++;
 
         // increment completed task counter 
         jobs_complete++;
@@ -154,7 +182,7 @@ void* consume(void* args) {
 }
 
 int main(int argc, char* argv[]) {
-    start_time = chrono::high_resolution_clock::now();
+    start_time = get_time();
     // defines the default amount of threads
     int nthreads;
     int thread_id = 0;
@@ -180,8 +208,8 @@ int main(int argc, char* argv[]) {
     } else {
         sprintf(output_file, "prodcon.%d.log", thread_id);
     }
-    cout << output_file << endl;
-
+    cout << output_file <<endl;
+    //output_to_file(output_file);
     pthread_t threads[nthreads];
 
 

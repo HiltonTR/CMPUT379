@@ -1,10 +1,18 @@
 all: link
 
 link: compile
-	g++ -o main main.o -lpthread
+	g++ -o prodcon main.o general.o outfile.o -lpthread 
 	
-compile: main.o
+compile: main.o general.o outfile.o
 
-prodcon.o: main.cpp
-	g++ -c -Wall main.cpp
+outfile.o: outfile.cpp outfile.h
+	g++ -c -Wall outfile.cpp 
 
+general.o: general.cpp general.h
+	g++ -c -Wall general.cpp 
+
+main.o: main.cpp tands.c
+	g++ -c -Wall main.cpp 
+
+clean:
+	rm -f *.o main.o
