@@ -1,8 +1,13 @@
 all: link
 
+optimize: optimization
+
 link: compile
 	g++ -o prodcon main.o general.o outfile.o -lpthread 
 	
+optimization: compile
+	g++ -o prodcon main.o general.o outfile.o -lpthread -O
+
 compile: main.o general.o outfile.o
 
 outfile.o: outfile.cpp outfile.h
