@@ -45,7 +45,7 @@ int ask_count = 0;
 int receive_count = 0;
 int complete_count = 0;
 int sleep_count = 0;
-
+vector<int> no_of_completed_tasks;
 // define id
 int consumeThreads = 1;
 int consumerID[1];
@@ -69,7 +69,7 @@ void* producer(void* args) {
             
             // log information here
             char task[128];
-            sprintf (task, "%.3f ID= %2d Q=%2ld %-10s %i\n",
+            sprintf (task, "\t%.3f ID= %2d Q=%2ld %-10s %i\n",
                 get_time_difference(start_time), 
                 0, buffer.size(), "Work", n);
             output.append(task);
@@ -91,7 +91,7 @@ void* producer(void* args) {
         } else if (command[0] == 'S') {
             // log information here
             char task[128];
-            sprintf (task, "%.3f ID= %2d Q=%2ld %-10s %i\n",
+            sprintf (task, "\t%.3f ID= %2d Q=%2ld %-10s %i\n",
                 get_time_difference(start_time), 
                 0, buffer.size(), "Sleep", n);
             output.append(task);
@@ -107,9 +107,6 @@ void* producer(void* args) {
 
     }
     in_progress = false;
-    // print output
-
-
     return 0;
 }
 
@@ -121,7 +118,7 @@ void* consume(void* args) {
     while(in_progress) {
         // Log asked
         char ask[128];
-        sprintf (ask, "%.3f ID= %2d      %-10s\n",
+        sprintf (ask, "\t%.3f ID= %2d      %-10s\n",
             get_time_difference(start_time), 
             id, "Ask");
         output.append(ask);
@@ -152,7 +149,7 @@ void* consume(void* args) {
 
         // Log received
         char receive[128];
-        sprintf (receive, "%.3f ID= %2d      %-10s %i\n",
+        sprintf (receive, "\t%.3f ID= %2d      %-10s %i\n",
             get_time_difference(start_time), 
             id, "Receive", n);
         output.append(receive);
@@ -166,7 +163,7 @@ void* consume(void* args) {
 
         // Log complete
         char complete[128];
-        sprintf (complete, "%.3f ID= %2d      %-10s %i\n",
+        sprintf (complete, "\t%.3f ID= %2d      %-10s %i\n",
             get_time_difference(start_time), 
             id, "Complete", n);
         output.append(complete);
@@ -178,6 +175,7 @@ void* consume(void* args) {
         // increment completed task counter 
         jobs_complete++;
     }
+    no_of_completed_tasks.push_back(jobs_complete);
     return 0;
 }
 
@@ -209,7 +207,7 @@ int main(int argc, char* argv[]) {
         sprintf(output_file, "prodcon.%d.log", thread_id);
     }
     cout << output_file <<endl;
-    //output_to_file(output_file);
+    output_to_file(output_file);
     pthread_t threads[nthreads];
 
 
@@ -223,6 +221,8 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < nthreads; i++) {
         pthread_join(threads[i], NULL);
     }
-    
+
+    output_stats(no_of_completed_tasks, work_count, ask_count, receive_count, complete_count, sleep_count, get_time_difference(start_time));
+
     return 0;
 }
