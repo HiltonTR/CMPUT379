@@ -15,7 +15,7 @@ main.o: main.cpp tands.c
 	g++ -c -Wall main.cpp 
 
 zip: 
-	zip prodcon.zip Makefile -r *.cpp *.h *.c
+	zip prodcon.zip makefile -r *.cpp *.h *.c
 
 clean:
 	rm -f *.o *.log prodcon
