@@ -31,6 +31,7 @@ typedef struct {
     pthread_mutex_t mutex;
 } pthread_buffer;
 
+// instantiates the locks
 pthread_buffer buffer_control;
 
 // creates a string to store the output
@@ -47,28 +48,30 @@ int complete_count = 0;
 int sleep_count = 0;
 map<int, int> thread_completed_tasks;
 
-// define id
+// define variables for producer and consumer
 int nthreads;
 int consumeThreads = 1;
-int consumerID[1];
 bool in_progress = false;
-
 bool done = false;
 
+/**
+ * This is the producer function
+ */
 void* producer(void* args) {
     string command;
     in_progress = true;
+    // we get the input from the file line by line
     while (getline(cin, command)) {
-        //cout << command[0] << " " << command[1] << endl;
+        // convert from ascii to the actual number
         int n = (int)command[1] - 48;
 
-        // check if it doesn't exceed max buffer, if it does wait
         if (command[0] == 'T'){
             // log information here
             char task[128];
             sprintf (task, "\t%.3f ID= %2d Q=%2ld %-10s %i\n",
                 get_time_difference(start_time), 
                 0, buffer.size(), "Work", n);
+            // append to a output string
             output.append(task);
             cout << task;
 
@@ -78,6 +81,7 @@ void* producer(void* args) {
             // lock the buffer
             pthread_mutex_lock(&buffer_control.mutex);
 
+            // check if it doesn't exceed max buffer, if it does wait for a space to free up
             while ((int)buffer.size() >= maxbuffer) {
                 pthread_cond_wait(&buffer_control.decrement, &buffer_control.mutex);
             }            
@@ -110,7 +114,11 @@ void* producer(void* args) {
 
 
     }
+    // change the flag so that the producer is done producing
     done = true;
+    // here we lock and broadcast that a signal to tell the comsumers that 
+    // the producer is done producing and if there are any hanging, they
+    // can exit. Broadcast found from https://www.ibm.com/docs/en/i/7.4?topic=ssw_ibm_i_74/apis/users_73.html 
     pthread_mutex_lock(&buffer_control.mutex);
     pthread_cond_broadcast(&buffer_control.increment);
     pthread_mutex_unlock(&buffer_control.mutex);
@@ -118,11 +126,15 @@ void* producer(void* args) {
     return 0;
 }
 
-//Consumer Section
+/**
+ * This is the consumer function
+ */
 void* consume(void* args) {
+    // here we define the variables needed
     int id = consumeThreads;
     int jobs_complete = 0;
     consumeThreads++;
+    // while loop to make sure that while the producer is running consumers are running as well
     while(in_progress) {
         // Log asked
         char ask[128];
@@ -140,6 +152,8 @@ void* consume(void* args) {
 
         // Wait for work
         while (buffer.empty()) {
+            // if the producer is done producing, this is here for the broadcast to end
+            // and to stop the threads from hanging
             if (done) {
                 pthread_mutex_unlock(&buffer_control.mutex);
                 return 0;
@@ -191,6 +205,11 @@ void* consume(void* args) {
     return 0;
 }
 
+/**
+ * main function
+ * referenced https://www.geeksforgeeks.org/producer-consumer-problem-and-its-implementation-with-c/ to 
+ * understand the implementation
+ */
 int main(int argc, char* argv[]) {
     start_time = get_time();
     // defines the default amount of threads
@@ -209,15 +228,17 @@ int main(int argc, char* argv[]) {
     if (argc > 2) {
         thread_id = atoi(argv[2]);
     }
-    
+    // max buffer is double the amount of threads
     maxbuffer = nthreads * 2;
 
+    // if a threadid is not given, we know the name is 0
     if (thread_id == 0 ) {
         sprintf(output_file, "prodcon.log");
     } else {
         sprintf(output_file, "prodcon.%d.log", thread_id);
     }
-    cout << output_file <<endl;
+
+    // redirect the output to the file
     output_to_file(output_file);
     pthread_t threads[nthreads];
 
@@ -228,11 +249,11 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < nthreads; ++i) {
         pthread_create(&threads[i], NULL, consume, 0);
     }
-
+    // join the threads
     for (int i = 0; i < nthreads; i++) {
         pthread_join(threads[i], NULL);
     }
-
+    // output the stat summary
     output_stats(nthreads, thread_completed_tasks, work_count, ask_count, receive_count, complete_count, sleep_count, get_time_difference(start_time));
 
     return 0;
