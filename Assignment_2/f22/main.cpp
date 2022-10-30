@@ -186,7 +186,6 @@ void* consume(void* args) {
 
         // increment completed task counter 
         jobs_complete++;
-        cout << id << "\t" << jobs_complete << "\t" << thread_completed_tasks.size() << endl;
         thread_completed_tasks[id] = jobs_complete;
     }
     return 0;
