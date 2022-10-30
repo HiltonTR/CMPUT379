@@ -20,7 +20,7 @@ main.o: main.cpp tands.c
 	g++ -c -Wall main.cpp 
 
 zip: 
-	zip prodcon.zip makefile -r *.cpp *.h *.c
+	zip prodcon.zip makefile -r *.cpp *.h *.c README
 
 clean:
 	rm -f *.o *.log prodcon

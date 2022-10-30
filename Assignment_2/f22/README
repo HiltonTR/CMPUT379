@@ -1,0 +1,13 @@
+Hilton Truong
+1615505
+CMPUT 379 Assignment 2
+
+Acknowledgements:
+    All the acknowledgements for the code are in the code as comments and sources have been provided.
+    For conceptual items such as the structure, my previous assignment from when I took the course last
+    winter was referenced. Notes from Professor Elmallah were also referenced. All internet references 
+    have been listed. Lab slides were also used to figure out how the pthread commands worked.
+
+    My design choice to implement the synchronization was by using pthreads as it was what was gone over
+    in the lab and the familiarity I had of it when I learned about it last term. That was the reason for
+    choosing it over using semaphores from <semaphores.h>.
