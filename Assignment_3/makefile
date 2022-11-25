@@ -9,7 +9,7 @@ client: client.cpp client.h
 	g++ client.cpp -Wall -o client
 
 zip:
-	tar -cvf Assign3.tar makefile README *.cpp *.man *.c *.h
+	tar -cvf Assign3.tar makefile README *.cpp *.man *.c *.h *.pdf
 
 clean:
 	rm -f *.o u* server client
