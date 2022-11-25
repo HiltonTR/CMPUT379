@@ -1,5 +1,10 @@
 #include "client.h"
-
+/**
+ * This is the client that sends transactions to the server to process. A lot of the code here is based off of and remain unchanged
+ * https://www.geeksforgeeks.org/socket-programming-cc/
+ * https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/?ref=lbp
+ * https://simpledevcode.wordpress.com/2016/06/16/client-server-chat-in-c-using-sockets/
+ */
 int client(char *argv[]) {
     //grab the IP address and port number 
     char *serverIp = argv[2]; 
@@ -37,32 +42,34 @@ int client(char *argv[]) {
 
     // redirect output to file
     freopen(hostnamePID.c_str(), "w", stdout);
-
+    // print out the headers needed for the client output file
     cout << "Using port " << port << endl;
     cout << "Using server address " << serverIp << endl;
     cout << "Host " << hostnamePID << endl;
 
+    // keep track of the total transactions
     string data;
     int totalTransactions = 0;
 
     while (getline(cin, data)) {
-        // int n = (int)command[1] - 48;
         if (data[0] == 'T'){
             totalTransactions++;
             // transaction
             memset(&msg, 0, sizeof(msg));//clear the buffer
-            // strcpy(msg, data.c_str());
             sprintf(msg, "%s.%d,%s", hostname, (int)pid, data.c_str());
+            // attempt to send data
             if(send(clientSd, (char*)&msg, strlen(msg), 0) < 0) {
                 cerr << "Client send failure" << endl;
                 exit(EXIT_FAILURE);
             }
+            // getting time found from https://www.techiedelight.com/get-current-timestamp-in-milliseconds-since-epoch-in-cpp/  
             double sendTime = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
             char sendStr[128];
             sprintf(sendStr, "%.2f: Send (T %i)", sendTime/1000, stoi(data.substr(1,data.size())));
             puts(sendStr);
 
             memset(&msg, 0, sizeof(msg));//clear the buffer
+            // attempt to receive data
             if(recv(clientSd, (char*)&msg, sizeof(msg), 0) < 0) {
                 cerr << "Client receive failure" << endl;
                 exit(EXIT_FAILURE);
@@ -79,19 +86,21 @@ int client(char *argv[]) {
             Sleep(stoi(data.substr(1,data.size())));
         }
     }
-
+    // close the client after the file is done
     close(clientSd);
     cout << "Sent " << totalTransactions << " transactions" << endl;
     return 0; 
 
 }
-
+/**
+ * main function to call the client
+ */
 int main(int argc, char *argv[]) {
     //we need 2 things: ip address and port number, in that order
     if(argc != 3) {
         cerr << "Usage: ip_address port" << endl; exit(0); 
     } 
-    
+    // calls the client to run
     client(argv);
 
     return 0;    

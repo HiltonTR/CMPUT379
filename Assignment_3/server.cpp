@@ -1,11 +1,14 @@
 #include "server.h"
-
+// For the general structure of the code, the following links were used. The second url was used for the select implementation.
 //https://www.geeksforgeeks.org/socket-programming-cc/
 //https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/?ref=lbp
 //https://simpledevcode.wordpress.com/2016/06/16/client-server-chat-in-c-using-sockets/
 
+/**
+ * This is the server which takes the transactions from the client and processes them
+ */
 int server(char *argv[]) {
-	//grab the port number
+	//grab the port number and limit it
     int port = atoi(argv[1]);
 
 	if (port < 5000 || port > 64000) {
@@ -21,21 +24,26 @@ int server(char *argv[]) {
         cerr << "Failed to get hostname" << endl;
         exit(EXIT_FAILURE);
     }
+	// get the pid
 	pid_t pid = getpid();
-
+	
+	// create the hostname and pid string so we can redirect the stdout later
     string hostnameString = hostname;
     string serverOutput = hostnameString+ '.' + to_string(pid);
 
     //buffer to send and receive messages with
     char buffer[1024];
-
+	
+	// define some variables we may need later. This was taken from the links above
 	int opt = TRUE;
 	int master_socket , addrlen , new_socket , client_socket[30] ,
 		max_clients = 30 , activity, i , valread , sd;
 	int max_sd;
 
+	// map to store the transactions that each client has done
 	map<string, int> client_completed_tasks;
 
+	// these are to check for the first and last transaction
 	bool first = true;
 	double firstTime, lastTime;
 
@@ -135,17 +143,11 @@ int server(char *argv[]) {
 		if (FD_ISSET(master_socket, &readfds))
 		{
 			if ((new_socket = accept(master_socket,
-					(struct sockaddr *)&address, (socklen_t*)&addrlen))<0)
-			{
+					(struct sockaddr *)&address, (socklen_t*)&addrlen))<0) {
 				perror("accept");
 				exit(EXIT_FAILURE);
 			}
-			
-			// //inform user of socket number - used in send and receive commands
-			// printf("New connection , socket fd is %d , ip is : %s , port : %d \n" , 
-            //         new_socket , inet_ntoa(address.sin_addr) , ntohs
-			// 	(address.sin_port));
-					
+								
 			//add new socket to array of sockets
 			for (i = 0; i < max_clients; i++)
 			{
@@ -171,28 +173,32 @@ int server(char *argv[]) {
 			if (FD_ISSET( sd , &readfds))
 			{
 				if ((valread = read(sd, buffer, 1024)) == 0) {	
-					//Somebody disconnected , get his details and print
+					//Somebody disconnected , get details
 					getpeername(sd , (struct sockaddr*)&address , \
 						(socklen_t*)&addrlen);
-					// printf("Host disconnected , ip %s , port %d \n" ,
-					// 	inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
 						
 					//Close the socket and mark as 0 in list for reuse
 					close( sd );
 					client_socket[i] = 0;
 				} else {
+					// here we increment the transaction count
 					transactionCount++;
+					// to get the time: https://www.techiedelight.com/get-current-timestamp-in-milliseconds-since-epoch-in-cpp/ 
 					double recvTime = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+					// check if this is the first transaction on the server
 					if (first) {
 						firstTime = recvTime;
 						first = false;
 					}
 					string recvString = buffer;
+					// process the data received 
 					int delim = recvString.find(",");
 					string hostNamePID = recvString.substr(0, delim);
 					string transaction = recvString.substr(delim + 1);
 					client_completed_tasks[hostNamePID]++;
+					// if it's a transaction
 					if (transaction[0] == 'T') {
+						// call trans for # and print out the T and then send the data back and print out the Done
 						Trans(stoi(transaction.substr(1, transaction.size())));
 						char recString[128];
 						sprintf(recString, "%.2f: # %i (T %i)\tfrom %s", recvTime/1000, transactionCount, stoi(recvString.substr(delim + 2)), hostNamePID.c_str()); 
@@ -200,12 +206,13 @@ int server(char *argv[]) {
 
 						memset(&buffer, 0, sizeof(buffer));	
 						strcpy(buffer, to_string(transactionCount).c_str());
-						double sendTime = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();		
+						double sendTime = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+						// attempt to send data		
 						if( send(sd , buffer , strlen(buffer) , 0) < 0) {
 							cerr << "Server send failure" << endl;
 							exit(EXIT_FAILURE);
 						}
-
+						// update the last item sent time to be the most recent send time
 						lastTime = sendTime;
 						char sendStr[128];
 						sprintf(sendStr, "%.2f: # %i (Done)\tfrom %s", sendTime/1000, transactionCount, hostNamePID.c_str()); 
@@ -228,7 +235,9 @@ int server(char *argv[]) {
 	return 0;
 }
 
-
+/**
+ * This is the main function that takes the input and calls server.
+ */
 int main(int argc , char *argv[]) {
 	//for the server, we only need to specify a port number
     if(argc != 2)

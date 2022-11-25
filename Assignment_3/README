@@ -13,7 +13,8 @@ Acknowledgements:
     https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/?ref=lbp
 
     Some assumptions that are made include that the inputs are going to be from input files. It is
-    also assumed that tands.c is not to be modified therefore no header file was created.
+    also assumed that tands.c is not to be modified therefore no header file was created. We also assume that
+    the inputs provided are correct. (As in they are S# and T#)
 
     Man page references were found below:
     https://www.howtogeek.com/682871/how-to-create-a-man-page-on-linux/ 
