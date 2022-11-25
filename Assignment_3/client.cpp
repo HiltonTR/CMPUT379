@@ -30,8 +30,8 @@ int main(int argc, char *argv[])
         cerr << "Usage: ip_address port" << endl; exit(0); 
     } 
     //grab the IP address and port number 
-    char *serverIp = argv[1]; 
-    int port = atoi(argv[2]); 
+    char *serverIp = argv[2]; 
+    int port = atoi(argv[1]); 
  
     // https://stackoverflow.com/questions/504810/how-do-i-find-the-current-machines-full-hostname-in-c-hostname-and-domain-info
     char hostname[128];
@@ -59,10 +59,16 @@ int main(int argc, char *argv[])
         cout<<"Error connecting to socket!"<<endl;
         return -1;
     }
-    
+
+    string hostnameString = hostname;
+    string hostnamePID = hostnameString+ '.' + to_string(pid);
+
+    // redirect output to file
+    freopen(hostnamePID.c_str(), "w", stdout);
+
     cout << "Using port " << port << endl;
     cout << "Using server address " << serverIp << endl;
-    cout << "Host " << hostname << "." << pid << endl;
+    cout << "Host " << hostnamePID << endl;
 
     string data;
     int totalTransactions = 0;

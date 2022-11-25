@@ -17,6 +17,8 @@
 #include <iostream>
 #include <chrono>
 #include <ctime>
+#include <fstream>
+#include <map>
 
 #include "tands.c"
 
@@ -44,6 +46,17 @@ int main(int argc , char *argv[])
 	// total transactions 
 	int transactionCount = 0;
 
+    // https://stackoverflow.com/questions/504810/how-do-i-find-the-current-machines-full-hostname-in-c-hostname-and-domain-info
+    char hostname[128];
+    if(gethostname(hostname, 128) < 0) {
+        cerr << "Failed to get hostname" << endl;
+        exit(EXIT_FAILURE);
+    }
+	pid_t pid = getpid();
+
+    string hostnameString = hostname;
+    string serverOutput = hostnameString+ '.' + to_string(pid);
+
     //buffer to send and receive messages with
     char buffer[1024];
 
@@ -51,6 +64,11 @@ int main(int argc , char *argv[])
 	int master_socket , addrlen , new_socket , client_socket[30] ,
 		max_clients = 30 , activity, i , valread , sd;
 	int max_sd;
+
+	map<string, int> client_completed_tasks;
+
+	bool first = true;
+	double firstTime, lastTime;
 
 	struct sockaddr_in address;		
 		
@@ -92,8 +110,6 @@ int main(int argc , char *argv[])
         exit(0);
     }
 
-	printf("Using port %d \n", port);
-
 	//try to specify maximum of 3 pending connections for the master socket
 	if (listen(master_socket, 3) < 0) {
 		perror("listen");
@@ -102,7 +118,15 @@ int main(int argc , char *argv[])
 		
 	//accept the incoming connection
 	addrlen = sizeof(address);
-		
+	
+	// declare timeout 
+	struct timeval timeout;
+
+	// redirect output to file
+	freopen(serverOutput.c_str(), "w", stdout);
+
+	printf("Using port %d \n", port);
+
 	while(TRUE)
 	{
 		//clear the socket set
@@ -126,10 +150,12 @@ int main(int argc , char *argv[])
 			if(sd > max_sd)
 				max_sd = sd;
 		}
-	
-		//wait for an activity on one of the sockets , timeout is NULL ,
-		//so wait indefinitely
-		activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);
+		// Timeout time of 30s
+		timeout.tv_sec = 30;
+		timeout.tv_usec = 0;
+
+		//wait for an activity on one of the sockets , timeout is 30
+		activity = select( max_sd + 1 , &readfds , NULL , NULL , &timeout);
 	
 		if ((activity < 0) && (errno!=EINTR))
 		{
@@ -162,8 +188,12 @@ int main(int argc , char *argv[])
 					break;
 				}
 			}
+		} else if (activity == 0) {
+			// server timeout so close socket
+			close(master_socket);
+			break;
 		}
-		
+
 		//else its some IO operation on some other socket
 		for (i = 0; i < max_clients; i++)
 		{
@@ -184,28 +214,34 @@ int main(int argc , char *argv[])
 				} else {
 					transactionCount++;
 					double recvTime = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+					if (first) {
+						firstTime = recvTime;
+						first = false;
+					}
 					string recvString = buffer;
 					int delim = recvString.find(",");
 					string hostNamePID = recvString.substr(0, delim);
 					string transaction = recvString.substr(delim + 1);
+					client_completed_tasks[hostNamePID]++;
 					if (transaction[0] == 'T') {
 						Trans(stoi(transaction.substr(1, transaction.size())));
-					}
-					char recString[128];
-					sprintf(recString, "%.2f: # %i (T %i) from %s", recvTime/1000, transactionCount, stoi(recvString.substr(delim + 2)), hostNamePID.c_str()); 
-					puts(recString);				
+						char recString[128];
+						sprintf(recString, "%.2f: # %i (T %i)\tfrom %s", recvTime/1000, transactionCount, stoi(recvString.substr(delim + 2)), hostNamePID.c_str()); 
+						puts(recString);				
 
-					memset(&buffer, 0, sizeof(buffer));	
-					strcpy(buffer, to_string(transactionCount).c_str());
-					double sendTime = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();		
-					if( send(sd , buffer , strlen(buffer) , 0) < 0) {
-						cerr << "Server send failure" << endl;
-               			exit(EXIT_FAILURE);
-					}
+						memset(&buffer, 0, sizeof(buffer));	
+						strcpy(buffer, to_string(transactionCount).c_str());
+						double sendTime = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();		
+						if( send(sd , buffer , strlen(buffer) , 0) < 0) {
+							cerr << "Server send failure" << endl;
+							exit(EXIT_FAILURE);
+						}
 
-					char sendStr[128];
-					sprintf(sendStr, "%.2f: # %i (T %i) from %s", sendTime/1000, transactionCount, stoi(recvString.substr(delim + 2)), hostNamePID.c_str()); 
-					puts(sendStr);
+						lastTime = sendTime;
+						char sendStr[128];
+						sprintf(sendStr, "%.2f: # %i (Done)\tfrom %s", sendTime/1000, transactionCount, hostNamePID.c_str()); 
+						puts(sendStr);
+					}
 				}
 			}
 		}
@@ -213,7 +249,12 @@ int main(int argc , char *argv[])
 
 	cout << endl;
 	cout << "SUMMARY" << endl;
-	cout << transactionCount << endl;
-		
+	// https://stackoverflow.com/questions/26281979/c-loop-through-map 
+	for (auto const& x : client_completed_tasks) {
+		cout << "\t" << x.second << " transactions from " << x.first << endl;  
+	}
+	cout <<transactionCount/((lastTime-firstTime)/1000)\
+		<< " transactions/sec\t(" << transactionCount << "/" << (lastTime-firstTime)/1000 << ")" << endl;
+
 	return 0;
 }
