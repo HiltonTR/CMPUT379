@@ -1,0 +1,26 @@
+.TH CLIENT 1 "2022-11-24" Linux "Client Manual"
+.SH NAME
+client \- is a program that takes inputs from stdin and passes them through a socket to a server
+.SH SYNOPSIS
+client 
+.I port 
+.I ip-address
+.SH DESCRIPTION
+.B client 
+reads the input from the user and either sleeps or sends a transaction to the server to be run. It will
+then wait for a reply from the server regarding the status of the transaction. After the input file is 
+completed, it will print out a summary to the file with the format of hostname.pid.
+.SH EXAMPLES
+.B client 
+.I 8000
+.I 127.0.0.1
+.I <inputfile
+.RS
+.B client will attempt to connect on port 8000 to server at 127.0.0.1
+.I 8000.
+.SH BUGS
+None found. 
+.SH AUTHOR
+Hilton Truong
+.SH "SEE ALSO"
+.BR server(1)

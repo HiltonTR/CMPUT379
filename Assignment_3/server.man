@@ -1,0 +1,25 @@
+.TH SERVER 1 "2022-11-24" Linux "Server Manual"
+.SH NAME
+server \- is a program the receives and runs the transactions passed to it from multiple clients
+.SH SYNOPSIS
+server 
+.I port 
+.SH DESCRIPTION
+.B server 
+takes connections from up to 30 clients and processes the transactions that are sent. A 
+socket is created and waits for a client to connect. If a client does not connect within 30 seconds
+it automatically times out. The data is the received and processed and a response is sent back to
+the client. A summary is the output at the end after it times out. The output is output to a file
+with the format of hostname.pid after the program ends.
+.SH EXAMPLES
+.B server 
+.I 8000
+.RS
+.B server starts on port 
+.I 8000.
+.SH BUGS
+None found. 
+.SH AUTHOR
+Hilton Truong
+.SH "SEE ALSO"
+.BR client(1)

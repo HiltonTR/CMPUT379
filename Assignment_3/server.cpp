@@ -1,42 +1,11 @@
+#include "server.h"
+
 //https://www.geeksforgeeks.org/socket-programming-cc/
-//https://github.com/bozkurthan/Simple-TCP-Server-Client-CPP-Example
-//Example code: A simple server side code, which echos back the received message.
-//Handle multiple socket connections with select and fd_set on Linux
-#include <stdio.h>
-#include <string.h> //strlen
-#include <stdlib.h>
-#include <errno.h>
-#include <unistd.h> //close
-#include <arpa/inet.h> //close
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/ioctl.h>
-#include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO macros
-#include <string>
-#include <iostream>
-#include <chrono>
-#include <ctime>
-#include <fstream>
-#include <map>
+//https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/?ref=lbp
+//https://simpledevcode.wordpress.com/2016/06/16/client-server-chat-in-c-using-sockets/
 
-#include "tands.c"
-
-using namespace std;
-
-#define TRUE 1
-#define FALSE 0
-
-int main(int argc , char *argv[])
-{
-	//for the server, we only need to specify a port number
-    if(argc != 2)
-    {
-        cerr << "Usage: port" << endl;
-        exit(0);
-    }
-
-    //grab the port number
+int server(char *argv[]) {
+	//grab the port number
     int port = atoi(argv[1]);
 
 	if (port < 5000 || port > 64000) {
@@ -255,6 +224,20 @@ int main(int argc , char *argv[])
 	}
 	cout <<transactionCount/((lastTime-firstTime)/1000)\
 		<< " transactions/sec\t(" << transactionCount << "/" << (lastTime-firstTime)/1000 << ")" << endl;
+
+	return 0;
+}
+
+
+int main(int argc , char *argv[]) {
+	//for the server, we only need to specify a port number
+    if(argc != 2)
+    {
+        cerr << "Usage: port" << endl;
+        exit(0);
+    }
+
+	server(argv);
 
 	return 0;
 }

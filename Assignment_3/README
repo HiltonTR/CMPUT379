@@ -1,0 +1,21 @@
+Hilton Truong
+1615505
+CMPUT 379 Assignment 3
+
+Acknowledgements:
+    All the acknowledgements for the code are in the code as comments and sources have been provided.
+    For conceptual items such as the structure, my previous assignment from when I took the course last
+    winter was referenced. Notes from Professor Elmallah were also referenced. All internet references 
+    have been listed. Lab slides were also referenced for some implementations.
+
+    Majority of the code structure was based off the geeksforgeeks links in the top of server.cpp.
+    https://www.geeksforgeeks.org/socket-programming-cc/
+    https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/?ref=lbp
+
+    Some assumptions that are made include that the inputs are going to be from input files. It is
+    also assumed that tands.c is not to be modified therefore no header file was created.
+
+    Man page references were found below:
+    https://www.howtogeek.com/682871/how-to-create-a-man-page-on-linux/ 
+    https://www.cyberciti.biz/faq/linux-unix-creating-a-manpage/
+    https://man7.org/linux/man-pages/man1/man.1.html 

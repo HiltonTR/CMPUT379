@@ -1,34 +1,6 @@
-#include <iostream>
-#include <string>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <netdb.h>
-#include <sys/uio.h>
-#include <sys/time.h>
-#include <sys/wait.h>
-#include <fcntl.h>
-#include <iostream>
-#include <fstream>
-#include <chrono>
-#include <ctime>
+#include "client.h"
 
-
-#include "tands.c"
-
-using namespace std;
-//Client side
-int main(int argc, char *argv[])
-{
-    //we need 2 things: ip address and port number, in that order
-    if(argc != 3) {
-        cerr << "Usage: ip_address port" << endl; exit(0); 
-    } 
+int client(char *argv[]) {
     //grab the IP address and port number 
     char *serverIp = argv[2]; 
     int port = atoi(argv[1]); 
@@ -110,5 +82,17 @@ int main(int argc, char *argv[])
 
     close(clientSd);
     cout << "Sent " << totalTransactions << " transactions" << endl;
+    return 0; 
+
+}
+
+int main(int argc, char *argv[]) {
+    //we need 2 things: ip address and port number, in that order
+    if(argc != 3) {
+        cerr << "Usage: ip_address port" << endl; exit(0); 
+    } 
+    
+    client(argv);
+
     return 0;    
 }
