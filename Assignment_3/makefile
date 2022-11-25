@@ -8,8 +8,8 @@ server: server.cpp server.h
 client: client.cpp client.h
 	g++ client.cpp -Wall -o client
 
-compress:
-	tar -cvf assignment3.tar Makefile README *.cpp *.man *.c
+zip:
+	tar -cvf Assign3.tar makefile README *.cpp *.man *.c *.h
 
 clean:
-	rm -f *.o ug* server client
+	rm -f *.o u* server client
